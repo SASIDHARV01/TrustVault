@@ -152,6 +152,37 @@ mutate, remove, insert, and reorder events and require verification to fail.
 
 **Commit evidence:** [ab16a8d](../../commit/ab16a8d)
 
+## 2026-10-22 — 06 — Phase 1 web foundation
+
+**What was asked**
+
+Begin the next implementation phase while preserving the incremental workflow,
+daily commits, and final-only deployment decision.
+
+**What the AI produced**
+
+It created the full-stack Next.js foundation, responsive public experience,
+health endpoint, baseline browser security headers, TypeScript and ESLint rules,
+unit-test setup, and one command for the complete local quality gate.
+
+**What was weak or wrong**
+
+Installing every tool at its newest release initially selected TypeScript 7,
+which the TypeScript ESLint integration did not yet support. The Next.js lint
+preset also introduced a development-only dependency advisory with no patched
+upstream version. Finally, the first Content Security Policy blocked React's
+local debugging runtime and produced a browser error overlay.
+
+**What we chose instead**
+
+Pin the supported TypeScript 6 and ESLint 9 major versions, replace the affected
+optional Next.js lint preset with strict TypeScript-aware rules, and allow
+`unsafe-eval` only while `NODE_ENV` is `development`. Production retains the
+stricter policy. Lint, type-checking, tests, production build, mobile browser QA,
+and the online dependency audit all passed before commit.
+
+**Commit evidence:** [cac2115](../../commit/cac2115)
+
 ## Entry template
 
 Copy this section for future material AI use:
