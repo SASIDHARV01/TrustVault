@@ -69,6 +69,28 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`PROMPTS.md`](PROMPTS.md) records how AI was used, what it got wrong, and the commits that corrected it.
 - API authorization documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
+## Local development
+
+Phase 1 requires Node.js 20.9 or newer. The application does not need database or
+storage credentials until their implementation phases.
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The unauthenticated health check is available at
+`GET /api/health` and intentionally returns only service status.
+
+Run the complete local quality gate before committing:
+
+```bash
+npm run check
+```
+
+This executes linting, strict TypeScript validation, unit tests, and the
+production build. Use `npm audit` separately because it requires registry access.
+
 ## Development rule
 
 No phase is considered complete until its targeted checks pass, its security implications are reflected in `THREATS.md`, and its work is committed with a descriptive conventional commit.
