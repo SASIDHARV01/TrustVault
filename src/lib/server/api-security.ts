@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import type { AuthorizationSystemRole } from "@/lib/document-authorization";
+import type { AuditRequestContext } from "@/lib/server/audit-service";
 import { getCurrentSession } from "@/lib/server/session";
 
 export type ApiActor = {
@@ -36,5 +37,19 @@ export function isTrustedMutationOrigin(request: Request) {
 
 export function createRequestId() {
   return randomUUID();
+}
+
+export function getAuditRequestContext(
+  request: Request,
+  requestId: string,
+): AuditRequestContext {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const connectingIp = request.headers.get("cf-connecting-ip")?.trim();
+
+  return {
+    requestId,
+    ipAddress: (connectingIp || forwardedFor || null)?.slice(0, 45) ?? null,
+    userAgent: request.headers.get("user-agent")?.slice(0, 512) ?? null,
+  };
 }
 

@@ -7,7 +7,14 @@ import type {
   UpdateDocumentInput,
 } from "@/lib/document-api";
 import type { AuthorizationSystemRole } from "@/lib/document-authorization";
-import { getDatabase } from "@/lib/server/database";
+import {
+  appendAuditEventInTransaction,
+  type AuditRequestContext,
+} from "@/lib/server/audit-service";
+import {
+  getDatabase,
+  runSerializableTransaction,
+} from "@/lib/server/database";
 import { authorizeDocument } from "@/lib/server/document-authorization";
 
 export type DocumentActor = {
@@ -21,6 +28,16 @@ export class DocumentServiceError extends Error {
   constructor(readonly code: DocumentServiceErrorCode) {
     super(code);
     this.name = "DocumentServiceError";
+  }
+}
+
+async function recordDocumentAudit(
+  database: Prisma.TransactionClient,
+  context: AuditRequestContext | undefined,
+  input: Parameters<typeof appendAuditEventInTransaction>[1],
+) {
+  if (context) {
+    await appendAuditEventInTransaction(database, { ...input, context });
   }
 }
 
@@ -157,8 +174,10 @@ export async function createDocumentMetadata(
   actor: DocumentActor,
   input: CreateDocumentInput,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  return runSerializableTransaction(
+    database,
     async (transaction) => {
       await assertCategoryBelongsToOwner(transaction, input.categoryId, actor.id);
 
@@ -172,9 +191,19 @@ export async function createDocumentMetadata(
         select: documentMetadataSelect,
       });
 
+      await recordDocumentAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId: document.id,
+        action: "DOCUMENT_CREATE",
+        outcome: "ALLOWED",
+        resource: "DOCUMENT",
+        targetId: document.id,
+        reason: "ALLOW_OWNER",
+        metadata: { fields: ["name", "description", "categoryId"] },
+      });
+
       return serializeDocument(document, "OWNER");
     },
-    { isolationLevel: "Serializable" },
   );
 }
 
@@ -182,8 +211,10 @@ export async function getDocumentMetadata(
   actor: DocumentActor,
   documentId: string,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
       const authorization = await authorizeDocument(
         {
@@ -196,7 +227,16 @@ export async function getDocumentMetadata(
       );
 
       if (!authorization.document || !authorization.decision.allowed) {
-        throw new DocumentServiceError("DOCUMENT_NOT_FOUND");
+        await recordDocumentAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId: authorization.document?.id ?? null,
+          action: "DOCUMENT_METADATA_READ",
+          outcome: "DENIED",
+          resource: "DOCUMENT",
+          targetId: documentId,
+          reason: authorization.decision.reason,
+        });
+        return { error: new DocumentServiceError("DOCUMENT_NOT_FOUND") } as const;
       }
 
       const document = await transaction.document.findUnique({
@@ -211,15 +251,29 @@ export async function getDocumentMetadata(
         },
       });
 
-      if (!document) throw new DocumentServiceError("DOCUMENT_NOT_FOUND");
+      if (!document) return { error: new DocumentServiceError("DOCUMENT_NOT_FOUND") } as const;
 
-      return serializeDocument(
-        document,
-        accessFor(actor, document.ownerId, document.grants[0]?.accessLevel),
-      );
+      await recordDocumentAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId: document.id,
+        action: "DOCUMENT_METADATA_READ",
+        outcome: "ALLOWED",
+        resource: "DOCUMENT",
+        targetId: document.id,
+        reason: authorization.decision.reason,
+      });
+
+      return {
+        document: serializeDocument(
+          document,
+          accessFor(actor, document.ownerId, document.grants[0]?.accessLevel),
+        ),
+      } as const;
     },
-    { isolationLevel: "RepeatableRead" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.document;
 }
 
 export async function updateDocumentMetadata(
@@ -227,8 +281,10 @@ export async function updateDocumentMetadata(
   documentId: string,
   input: UpdateDocumentInput,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
       const authorization = await authorizeDocument(
         {
@@ -241,7 +297,16 @@ export async function updateDocumentMetadata(
       );
 
       if (!authorization.document || !authorization.decision.allowed) {
-        throw new DocumentServiceError("DOCUMENT_NOT_FOUND");
+        await recordDocumentAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId: authorization.document?.id ?? null,
+          action: "DOCUMENT_UPDATE",
+          outcome: "DENIED",
+          resource: "DOCUMENT",
+          targetId: documentId,
+          reason: authorization.decision.reason,
+        });
+        return { error: new DocumentServiceError("DOCUMENT_NOT_FOUND") } as const;
       }
 
       await assertCategoryBelongsToOwner(
@@ -256,25 +321,44 @@ export async function updateDocumentMetadata(
         select: documentMetadataSelect,
       });
 
-      return serializeDocument(
-        document,
-        accessFor(
-          actor,
-          document.ownerId,
-          authorization.decision.reason === "ALLOW_EDIT_GRANT" ? "EDIT" : undefined,
+      await recordDocumentAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId: document.id,
+        action: "DOCUMENT_UPDATE",
+        outcome: "ALLOWED",
+        resource: "DOCUMENT",
+        targetId: document.id,
+        reason: authorization.decision.reason,
+        metadata: { fields: Object.keys(input).sort() },
+      });
+
+      return {
+        document: serializeDocument(
+          document,
+          accessFor(
+            actor,
+            document.ownerId,
+            authorization.decision.reason === "ALLOW_EDIT_GRANT"
+              ? "EDIT"
+              : undefined,
+          ),
         ),
-      );
+      } as const;
     },
-    { isolationLevel: "Serializable" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.document;
 }
 
 export async function deleteDocument(
   actor: DocumentActor,
   documentId: string,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
       const authorization = await authorizeDocument(
         {
@@ -287,7 +371,16 @@ export async function deleteDocument(
       );
 
       if (!authorization.document || !authorization.decision.allowed) {
-        throw new DocumentServiceError("DOCUMENT_NOT_FOUND");
+        await recordDocumentAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId: authorization.document?.id ?? null,
+          action: "DOCUMENT_DELETE",
+          outcome: "DENIED",
+          resource: "DOCUMENT",
+          targetId: documentId,
+          reason: authorization.decision.reason,
+        });
+        return { error: new DocumentServiceError("DOCUMENT_NOT_FOUND") } as const;
       }
 
       const document = await transaction.document.update({
@@ -300,18 +393,32 @@ export async function deleteDocument(
         select: documentMetadataSelect,
       });
 
-      return serializeDocument(document, "OWNER");
+      await recordDocumentAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId: document.id,
+        action: "DOCUMENT_DELETE",
+        outcome: "ALLOWED",
+        resource: "DOCUMENT",
+        targetId: document.id,
+        reason: authorization.decision.reason,
+      });
+
+      return { document: serializeDocument(document, "OWNER") } as const;
     },
-    { isolationLevel: "Serializable" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.document;
 }
 
 export async function restoreDocument(
   actor: DocumentActor,
   documentId: string,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
       const authorization = await authorizeDocument(
         {
@@ -324,7 +431,16 @@ export async function restoreDocument(
       );
 
       if (!authorization.document || !authorization.decision.allowed) {
-        throw new DocumentServiceError("DOCUMENT_NOT_FOUND");
+        await recordDocumentAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId: authorization.document?.id ?? null,
+          action: "DOCUMENT_RESTORE",
+          outcome: "DENIED",
+          resource: "DOCUMENT",
+          targetId: documentId,
+          reason: authorization.decision.reason,
+        });
+        return { error: new DocumentServiceError("DOCUMENT_NOT_FOUND") } as const;
       }
 
       const document = await transaction.document.update({
@@ -333,9 +449,21 @@ export async function restoreDocument(
         select: documentMetadataSelect,
       });
 
-      return serializeDocument(document, "OWNER");
+      await recordDocumentAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId: document.id,
+        action: "DOCUMENT_RESTORE",
+        outcome: "ALLOWED",
+        resource: "DOCUMENT",
+        targetId: document.id,
+        reason: authorization.decision.reason,
+      });
+
+      return { document: serializeDocument(document, "OWNER") } as const;
     },
-    { isolationLevel: "Serializable" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.document;
 }
 

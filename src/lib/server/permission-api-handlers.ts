@@ -12,10 +12,13 @@ import {
 } from "@/lib/permission-api";
 import {
   createRequestId,
+  getAuditRequestContext,
   getApiActor,
   isTrustedMutationOrigin,
   type ApiActor,
 } from "@/lib/server/api-security";
+import type { AuditRequestContext } from "@/lib/server/audit-service";
+import { getDatabase } from "@/lib/server/database";
 import {
   createDocumentGrant,
   listDocumentGrants,
@@ -31,20 +34,57 @@ type PermissionApiDependencies = {
   getActor: () => Promise<ApiActor | null>;
   trustedMutationOrigin: (request: Request) => boolean;
   lookupRecipient: typeof lookupEligibleRecipient;
-  listGrants: typeof listDocumentGrants;
-  createGrant: typeof createDocumentGrant;
-  updateGrant: typeof updateDocumentGrant;
-  revokeGrant: typeof revokeDocumentGrant;
+  listGrants: (
+    actor: ApiActor,
+    documentId: string,
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof listDocumentGrants>;
+  createGrant: (
+    actor: ApiActor,
+    documentId: string,
+    input: Parameters<typeof createDocumentGrant>[2],
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof createDocumentGrant>;
+  updateGrant: (
+    actor: ApiActor,
+    documentId: string,
+    grantId: string,
+    input: Parameters<typeof updateDocumentGrant>[3],
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof updateDocumentGrant>;
+  revokeGrant: (
+    actor: ApiActor,
+    documentId: string,
+    grantId: string,
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof revokeDocumentGrant>;
 };
 
 const defaultDependencies: PermissionApiDependencies = {
   getActor: getApiActor,
   trustedMutationOrigin: isTrustedMutationOrigin,
   lookupRecipient: lookupEligibleRecipient,
-  listGrants: listDocumentGrants,
-  createGrant: createDocumentGrant,
-  updateGrant: updateDocumentGrant,
-  revokeGrant: revokeDocumentGrant,
+  listGrants: (actor, documentId, auditContext) =>
+    listDocumentGrants(actor, documentId, getDatabase(), auditContext),
+  createGrant: (actor, documentId, input, auditContext) =>
+    createDocumentGrant(actor, documentId, input, getDatabase(), auditContext),
+  updateGrant: (actor, documentId, grantId, input, auditContext) =>
+    updateDocumentGrant(
+      actor,
+      documentId,
+      grantId,
+      input,
+      getDatabase(),
+      auditContext,
+    ),
+  revokeGrant: (actor, documentId, grantId, auditContext) =>
+    revokeDocumentGrant(
+      actor,
+      documentId,
+      grantId,
+      getDatabase(),
+      auditContext,
+    ),
 };
 
 function response(requestId: string, body: unknown, status = 200) {
@@ -230,7 +270,11 @@ export function createPermissionApiHandlers(
         const documentId = documentIdSchema.safeParse(rawDocumentId);
         if (!documentId.success) return documentNotFound(requestId);
 
-        const result = await dependencies.listGrants(actor, documentId.data);
+        const result = await dependencies.listGrants(
+          actor,
+          documentId.data,
+          getAuditRequestContext(request, requestId),
+        );
         return response(requestId, { data: result });
       });
     },
@@ -265,6 +309,7 @@ export function createPermissionApiHandlers(
           actor,
           documentId.data,
           parsed.data,
+          getAuditRequestContext(request, requestId),
         );
         return response(requestId, { data: { grant } }, 201);
       });
@@ -308,6 +353,7 @@ export function createPermissionApiHandlers(
           documentId.data,
           grantId.data,
           parsed.data,
+          getAuditRequestContext(request, requestId),
         );
         return response(requestId, { data: { grant } });
       });
@@ -341,6 +387,7 @@ export function createPermissionApiHandlers(
           actor,
           documentId.data,
           grantId.data,
+          getAuditRequestContext(request, requestId),
         );
         return response(requestId, { data: { grant } });
       });

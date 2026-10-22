@@ -5,9 +5,16 @@ import type {
   CreateGrantInput,
   UpdateGrantInput,
 } from "@/lib/permission-api";
-import { getDatabase } from "@/lib/server/database";
+import {
+  getDatabase,
+  runSerializableTransaction,
+} from "@/lib/server/database";
 import { authorizeDocument } from "@/lib/server/document-authorization";
 import type { DocumentActor } from "@/lib/server/document-service";
+import {
+  appendAuditEventInTransaction,
+  type AuditRequestContext,
+} from "@/lib/server/audit-service";
 
 export type PermissionServiceErrorCode =
   | "DOCUMENT_NOT_FOUND"
@@ -52,10 +59,22 @@ function serializeGrant(grant: GrantRow) {
   };
 }
 
-async function requireGrantOwner(
+async function recordPermissionAudit(
+  database: Prisma.TransactionClient,
+  context: AuditRequestContext | undefined,
+  input: Parameters<typeof appendAuditEventInTransaction>[1],
+) {
+  if (context) {
+    await appendAuditEventInTransaction(database, { ...input, context });
+  }
+}
+
+async function authorizeGrantOwner(
   database: Prisma.TransactionClient,
   actor: DocumentActor,
   documentId: string,
+  action: "PERMISSION_LIST" | "PERMISSION_GRANT" | "PERMISSION_UPDATE" | "PERMISSION_REVOKE",
+  auditContext: AuditRequestContext | undefined,
 ) {
   const authorization = await authorizeDocument(
     {
@@ -68,7 +87,16 @@ async function requireGrantOwner(
   );
 
   if (!authorization.document || !authorization.decision.allowed) {
-    throw new PermissionServiceError("DOCUMENT_NOT_FOUND");
+    await recordPermissionAudit(database, auditContext, {
+      actorId: actor.id,
+      documentId: authorization.document?.id ?? null,
+      action,
+      outcome: "DENIED",
+      resource: "PERMISSION",
+      targetId: documentId,
+      reason: authorization.decision.reason,
+    });
+    return null;
   }
 
   return authorization.document;
@@ -88,7 +116,6 @@ async function findEligibleRecipient(
     select: { id: true, name: true, email: true },
   });
 
-  if (!recipient) throw new PermissionServiceError("RECIPIENT_NOT_FOUND");
   return recipient;
 }
 
@@ -124,10 +151,21 @@ export async function listDocumentGrants(
   actor: DocumentActor,
   documentId: string,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
-      await requireGrantOwner(transaction, actor, documentId);
+      const document = await authorizeGrantOwner(
+        transaction,
+        actor,
+        documentId,
+        "PERMISSION_LIST",
+        auditContext,
+      );
+      if (!document) {
+        return { error: new PermissionServiceError("DOCUMENT_NOT_FOUND") } as const;
+      }
 
       const grants = await transaction.documentGrant.findMany({
         where: { documentId },
@@ -135,10 +173,23 @@ export async function listDocumentGrants(
         select: grantSelect,
       });
 
-      return { grants: grants.map(serializeGrant) };
+      await recordPermissionAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId,
+        action: "PERMISSION_LIST",
+        outcome: "ALLOWED",
+        resource: "PERMISSION",
+        targetId: documentId,
+        reason: "ALLOW_OWNER",
+        metadata: { resultCount: grants.length },
+      });
+
+      return { value: { grants: grants.map(serializeGrant) } } as const;
     },
-    { isolationLevel: "RepeatableRead" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.value;
 }
 
 export async function createDocumentGrant(
@@ -146,23 +197,56 @@ export async function createDocumentGrant(
   documentId: string,
   input: CreateGrantInput,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
   try {
-    return await database.$transaction(
+    const result = await runSerializableTransaction(
+      database,
       async (transaction) => {
-        await requireGrantOwner(transaction, actor, documentId);
+        const document = await authorizeGrantOwner(
+          transaction,
+          actor,
+          documentId,
+          "PERMISSION_GRANT",
+          auditContext,
+        );
+        if (!document) {
+          return { error: new PermissionServiceError("DOCUMENT_NOT_FOUND") } as const;
+        }
         const recipient = await findEligibleRecipient(
           transaction,
           actor.id,
           input.recipientEmail,
         );
+        if (!recipient) {
+          await recordPermissionAudit(transaction, auditContext, {
+            actorId: actor.id,
+            documentId,
+            action: "PERMISSION_GRANT",
+            outcome: "DENIED",
+            resource: "PERMISSION",
+            targetId: documentId,
+            reason: "RECIPIENT_NOT_FOUND",
+          });
+          return { error: new PermissionServiceError("RECIPIENT_NOT_FOUND") } as const;
+        }
         const existingGrant = await transaction.documentGrant.findFirst({
           where: { documentId, recipientId: recipient.id, revokedAt: null },
           select: { id: true },
         });
 
         if (existingGrant) {
-          throw new PermissionServiceError("ACTIVE_GRANT_EXISTS");
+          await recordPermissionAudit(transaction, auditContext, {
+            actorId: actor.id,
+            documentId,
+            action: "PERMISSION_GRANT",
+            outcome: "DENIED",
+            resource: "PERMISSION",
+            targetId: existingGrant.id,
+            reason: "ACTIVE_GRANT_EXISTS",
+            metadata: { recipientId: recipient.id },
+          });
+          return { error: new PermissionServiceError("ACTIVE_GRANT_EXISTS") } as const;
         }
 
         const grant = await transaction.documentGrant.create({
@@ -175,10 +259,25 @@ export async function createDocumentGrant(
           select: grantSelect,
         });
 
-        return serializeGrant(grant);
+        await recordPermissionAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId,
+          action: "PERMISSION_GRANT",
+          outcome: "ALLOWED",
+          resource: "PERMISSION",
+          targetId: grant.id,
+          reason: "ALLOW_OWNER",
+          metadata: {
+            recipientId: recipient.id,
+            accessLevel: input.accessLevel,
+          },
+        });
+
+        return { value: serializeGrant(grant) } as const;
       },
-      { isolationLevel: "Serializable" },
     );
+    if ("error" in result) throw result.error;
+    return result.value;
   } catch (error) {
     return translateUniqueGrantError(error);
   }
@@ -190,19 +289,50 @@ export async function updateDocumentGrant(
   grantId: string,
   input: UpdateGrantInput,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
   try {
-    return await database.$transaction(
+    const result = await runSerializableTransaction(
+      database,
       async (transaction) => {
-        await requireGrantOwner(transaction, actor, documentId);
+        const document = await authorizeGrantOwner(
+          transaction,
+          actor,
+          documentId,
+          "PERMISSION_UPDATE",
+          auditContext,
+        );
+        if (!document) {
+          return { error: new PermissionServiceError("DOCUMENT_NOT_FOUND") } as const;
+        }
         const currentGrant = await transaction.documentGrant.findFirst({
           where: { id: grantId, documentId, revokedAt: null },
           select: { id: true, recipientId: true, accessLevel: true },
         });
 
-        if (!currentGrant) throw new PermissionServiceError("GRANT_NOT_FOUND");
+        if (!currentGrant) {
+          await recordPermissionAudit(transaction, auditContext, {
+            actorId: actor.id,
+            documentId,
+            action: "PERMISSION_UPDATE",
+            outcome: "DENIED",
+            resource: "PERMISSION",
+            targetId: grantId,
+            reason: "GRANT_NOT_FOUND",
+          });
+          return { error: new PermissionServiceError("GRANT_NOT_FOUND") } as const;
+        }
         if (currentGrant.accessLevel === input.accessLevel) {
-          throw new PermissionServiceError("GRANT_UNCHANGED");
+          await recordPermissionAudit(transaction, auditContext, {
+            actorId: actor.id,
+            documentId,
+            action: "PERMISSION_UPDATE",
+            outcome: "DENIED",
+            resource: "PERMISSION",
+            targetId: grantId,
+            reason: "GRANT_UNCHANGED",
+          });
+          return { error: new PermissionServiceError("GRANT_UNCHANGED") } as const;
         }
 
         const revokedAt = new Date();
@@ -220,10 +350,27 @@ export async function updateDocumentGrant(
           select: grantSelect,
         });
 
-        return serializeGrant(replacement);
+        await recordPermissionAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId,
+          action: "PERMISSION_UPDATE",
+          outcome: "ALLOWED",
+          resource: "PERMISSION",
+          targetId: replacement.id,
+          reason: "ALLOW_OWNER",
+          metadata: {
+            recipientId: currentGrant.recipientId,
+            previousGrantId: currentGrant.id,
+            previousAccessLevel: currentGrant.accessLevel,
+            accessLevel: input.accessLevel,
+          },
+        });
+
+        return { value: serializeGrant(replacement) } as const;
       },
-      { isolationLevel: "Serializable" },
     );
+    if ("error" in result) throw result.error;
+    return result.value;
   } catch (error) {
     return translateUniqueGrantError(error);
   }
@@ -234,26 +381,64 @@ export async function revokeDocumentGrant(
   documentId: string,
   grantId: string,
   database: PrismaClient = getDatabase(),
+  auditContext?: AuditRequestContext,
 ) {
-  return database.$transaction(
+  const result = await runSerializableTransaction(
+    database,
     async (transaction) => {
-      await requireGrantOwner(transaction, actor, documentId);
+      const document = await authorizeGrantOwner(
+        transaction,
+        actor,
+        documentId,
+        "PERMISSION_REVOKE",
+        auditContext,
+      );
+      if (!document) {
+        return { error: new PermissionServiceError("DOCUMENT_NOT_FOUND") } as const;
+      }
       const result = await transaction.documentGrant.updateMany({
         where: { id: grantId, documentId, revokedAt: null },
         data: { revokedAt: new Date(), revokedById: actor.id },
       });
 
-      if (result.count !== 1) throw new PermissionServiceError("GRANT_NOT_FOUND");
+      if (result.count !== 1) {
+        await recordPermissionAudit(transaction, auditContext, {
+          actorId: actor.id,
+          documentId,
+          action: "PERMISSION_REVOKE",
+          outcome: "DENIED",
+          resource: "PERMISSION",
+          targetId: grantId,
+          reason: "GRANT_NOT_FOUND",
+        });
+        return { error: new PermissionServiceError("GRANT_NOT_FOUND") } as const;
+      }
 
       const grant = await transaction.documentGrant.findUnique({
         where: { id: grantId },
         select: grantSelect,
       });
-      if (!grant) throw new PermissionServiceError("GRANT_NOT_FOUND");
+      if (!grant) return { error: new PermissionServiceError("GRANT_NOT_FOUND") } as const;
 
-      return serializeGrant(grant);
+      await recordPermissionAudit(transaction, auditContext, {
+        actorId: actor.id,
+        documentId,
+        action: "PERMISSION_REVOKE",
+        outcome: "ALLOWED",
+        resource: "PERMISSION",
+        targetId: grant.id,
+        reason: "ALLOW_OWNER",
+        metadata: {
+          recipientId: grant.recipient.id,
+          accessLevel: grant.accessLevel,
+        },
+      });
+
+      return { value: serializeGrant(grant) } as const;
     },
-    { isolationLevel: "Serializable" },
   );
+
+  if ("error" in result) throw result.error;
+  return result.value;
 }
 

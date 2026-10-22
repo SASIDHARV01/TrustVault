@@ -11,10 +11,13 @@ import {
 } from "@/lib/document-api";
 import {
   createRequestId,
+  getAuditRequestContext,
   getApiActor,
   isTrustedMutationOrigin,
   type ApiActor,
 } from "@/lib/server/api-security";
+import type { AuditRequestContext } from "@/lib/server/audit-service";
+import { getDatabase } from "@/lib/server/database";
 import {
   createDocumentMetadata,
   deleteDocument,
@@ -31,22 +34,48 @@ type DocumentApiDependencies = {
   getActor: () => Promise<ApiActor | null>;
   trustedMutationOrigin: (request: Request) => boolean;
   listDocuments: typeof listAccessibleDocuments;
-  createDocument: typeof createDocumentMetadata;
-  getDocument: typeof getDocumentMetadata;
-  updateDocument: typeof updateDocumentMetadata;
-  deleteDocument: typeof deleteDocument;
-  restoreDocument: typeof restoreDocument;
+  createDocument: (
+    actor: ApiActor,
+    input: Parameters<typeof createDocumentMetadata>[1],
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof createDocumentMetadata>;
+  getDocument: (
+    actor: ApiActor,
+    documentId: string,
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof getDocumentMetadata>;
+  updateDocument: (
+    actor: ApiActor,
+    documentId: string,
+    input: Parameters<typeof updateDocumentMetadata>[2],
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof updateDocumentMetadata>;
+  deleteDocument: (
+    actor: ApiActor,
+    documentId: string,
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof deleteDocument>;
+  restoreDocument: (
+    actor: ApiActor,
+    documentId: string,
+    auditContext: AuditRequestContext,
+  ) => ReturnType<typeof restoreDocument>;
 };
 
 const defaultDependencies: DocumentApiDependencies = {
   getActor: getApiActor,
   trustedMutationOrigin: isTrustedMutationOrigin,
   listDocuments: listAccessibleDocuments,
-  createDocument: createDocumentMetadata,
-  getDocument: getDocumentMetadata,
-  updateDocument: updateDocumentMetadata,
-  deleteDocument,
-  restoreDocument,
+  createDocument: (actor, input, auditContext) =>
+    createDocumentMetadata(actor, input, getDatabase(), auditContext),
+  getDocument: (actor, documentId, auditContext) =>
+    getDocumentMetadata(actor, documentId, getDatabase(), auditContext),
+  updateDocument: (actor, documentId, input, auditContext) =>
+    updateDocumentMetadata(actor, documentId, input, getDatabase(), auditContext),
+  deleteDocument: (actor, documentId, auditContext) =>
+    deleteDocument(actor, documentId, getDatabase(), auditContext),
+  restoreDocument: (actor, documentId, auditContext) =>
+    restoreDocument(actor, documentId, getDatabase(), auditContext),
 };
 
 function response(requestId: string, body: unknown, status = 200) {
@@ -226,7 +255,11 @@ export function createDocumentApiHandlers(
           );
         }
 
-        const document = await dependencies.createDocument(actor, parsed.data);
+        const document = await dependencies.createDocument(
+          actor,
+          parsed.data,
+          getAuditRequestContext(request, requestId),
+        );
         return response(requestId, { data: { document } }, 201);
       });
     },
@@ -241,7 +274,11 @@ export function createDocumentApiHandlers(
         const documentId = documentIdSchema.safeParse(rawDocumentId);
         if (!documentId.success) return notFoundResponse(requestId);
 
-        const document = await dependencies.getDocument(actor, documentId.data);
+        const document = await dependencies.getDocument(
+          actor,
+          documentId.data,
+          getAuditRequestContext(request, requestId),
+        );
         return response(requestId, { data: { document } });
       });
     },
@@ -278,6 +315,7 @@ export function createDocumentApiHandlers(
           actor,
           documentId.data,
           parsed.data,
+          getAuditRequestContext(request, requestId),
         );
         return response(requestId, { data: { document } });
       });
@@ -301,7 +339,11 @@ export function createDocumentApiHandlers(
         const documentId = documentIdSchema.safeParse(rawDocumentId);
         if (!documentId.success) return notFoundResponse(requestId);
 
-        const document = await dependencies.deleteDocument(actor, documentId.data);
+        const document = await dependencies.deleteDocument(
+          actor,
+          documentId.data,
+          getAuditRequestContext(request, requestId),
+        );
         return response(requestId, { data: { document } });
       });
     },
@@ -324,7 +366,11 @@ export function createDocumentApiHandlers(
         const documentId = documentIdSchema.safeParse(rawDocumentId);
         if (!documentId.success) return notFoundResponse(requestId);
 
-        const document = await dependencies.restoreDocument(actor, documentId.data);
+        const document = await dependencies.restoreDocument(
+          actor,
+          documentId.data,
+          getAuditRequestContext(request, requestId),
+        );
         return response(requestId, { data: { document } });
       });
     },
