@@ -75,6 +75,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`PROMPTS.md`](PROMPTS.md) records how AI was used, what it got wrong, and the commits that corrected it.
 - [`docs/DATABASE.md`](docs/DATABASE.md) explains the Prisma/PostgreSQL model, invariants, migration workflow, and verification evidence.
 - [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) explains credential, session, role, disabled-account, seed, and test decisions.
+- [`docs/AUTHORIZATION.md`](docs/AUTHORIZATION.md) defines the deny-by-default per-document action matrix and immediate-revocation contract.
 - API authorization documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development

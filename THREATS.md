@@ -297,8 +297,8 @@ Each identifier is stable and will be referenced by automated tests.
 ## Current implementation evidence
 
 Phases 2–3 establish database controls and the authentication boundary. They do
-not claim that document-level application authorization or audit hashing is
-finished.
+not claim that document HTTP routes or audit hashing are finished. Phase 4.1
+adds the centralized document decision kernel those routes must call.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -317,6 +317,17 @@ finished.
 - TV-022: runtime auth settings use server-only environment variables, the
   repository contains placeholders only, and the production build remains
   independent from live credentials without weakening runtime checks.
+- TV-004 and TV-005: the action matrix denies unrelated users and prevents READ
+  or EDIT recipients from performing owner-only operations. Unit tests evaluate
+  every action for owner, reader, editor, unrelated user, and administrator.
+- TV-006: the server resolver selects only grants whose `revokedAt` is null and
+  does not cache decisions. An isolated PostgreSQL test proves that revocation
+  changes the very next download decision from allowed to denied.
+- TV-007: administrators receive metadata/activity visibility but no automatic
+  content, edit, delete, restore, or sharing power. Content requires the distinct
+  reason-bearing `ADMIN_OVERRIDE_READ` decision.
+- TV-008: decision reasons remain internal; future routes must map missing and
+  inaccessible documents to the same non-revealing client response.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.

@@ -249,6 +249,37 @@ PostgreSQL.
 
 **Commit evidence:** [f2d2afe](../../commit/f2d2afe), [43a0842](../../commit/43a0842), [7eafd92](../../commit/7eafd92)
 
+## 2026-10-22 — 09 — Phase 4.1 document authorization kernel
+
+**What was asked**
+
+After merging authentication, begin the document-authorization phase in medium,
+reviewable work while explaining the existing system, next implementation,
+workflow, and commits before committing.
+
+**What the AI produced**
+
+It introduced a centralized action-based permission policy, server-only current-
+grant lookup, stable allow/deny reasons, administrator override validation,
+exhaustive role-matrix tests, a live PostgreSQL revocation test, and authorization
+architecture documentation.
+
+**What was weak or wrong**
+
+A simplistic role check would have made administrators universal readers or
+allowed READ/EDIT grants to inherit owner powers. A cached permission result
+would also contradict immediate revocation, while returning detailed deny
+reasons to clients would help attackers enumerate documents.
+
+**What we chose instead**
+
+Evaluate one explicit action using server-derived ownership, current active
+grant, document state, and system role. Keep administrator content access in a
+separate reason-bearing override, query `revokedAt: null` on every request, deny
+by default, and reserve detailed decision reasons for services and audit records.
+
+**Commit evidence:** [1c9fdc3](../../commit/1c9fdc3), [f3eafe7](../../commit/f3eafe7)
+
 ## Entry template
 
 Copy this section for future material AI use:
