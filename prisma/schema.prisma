@@ -49,6 +49,7 @@ enum AuditAction {
   ADMIN_OVERRIDE_READ
   AUDIT_VIEW
   AUDIT_VERIFY
+  AUDIT_CHECKPOINT_CREATE
 }
 
 enum AuditOutcome {
