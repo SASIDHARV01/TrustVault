@@ -6,7 +6,7 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. Production deployment to Render and the Cloudflare domain is intentionally scheduled for the final implementation phase.
 
-Phases 0–6 currently provide the security contract, public web foundation,
+Phases 0–7 currently provide the security contract, public web foundation,
 validated PostgreSQL data model, Better Auth credentials and sessions, protected
 member/admin routes, repeatable demo identities, centralized per-document
 authorization, authorized document metadata APIs, and owner-controlled named-user
@@ -15,8 +15,10 @@ an HMAC-linked append-only chain, owner/admin activity APIs, and administrator
 integrity verification. Phase 6 completes private R2-backed uploads, immutable
 versions, authorized preview/download, immediate content revocation, audited
 administrator override, failure compensation, actual-byte SHA-256 verification,
-and locked-prefix audit checkpoints. Product screens, live R2 verification,
-search/categories, hardening, and deployment remain upcoming phases.
+and locked-prefix audit checkpoints. Phase 7 adds audited owner-scoped category
+management and database-authorized search by name, owner, category, date, state,
+and safe sort/pagination fields. Product screens, live R2 verification,
+hardening, and deployment remain upcoming phases.
 
 ## Security invariants
 
@@ -86,6 +88,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) explains exact-email recipient lookup, owner-only sharing, history-preserving permission changes, and revocation.
 - [`docs/AUDIT.md`](docs/AUDIT.md) explains event coverage, HMAC chaining, transactional writes, activity authorization, verification, and the external-checkpoint boundary.
 - [`docs/STORAGE.md`](docs/STORAGE.md) defines the private R2 boundary, key strategy, least-privilege configuration, and current verification limits.
+- [`docs/ORGANIZATION_SEARCH.md`](docs/ORGANIZATION_SEARCH.md) documents owner-scoped categories, authorization-composed search filters, and enumeration controls.
 - Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development

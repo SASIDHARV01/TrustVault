@@ -448,6 +448,38 @@ production immutability.
 
 **Commit evidence:** pending Phase 6 commits
 
+## 2026-10-22 — 15 — Phase 7 categories and secure search
+
+**What was asked**
+
+Continue after merging Phase 6 and implement document organization and search
+on the dedicated `document-organization-search` branch.
+
+**What the AI produced**
+
+It added owner-scoped category create/list/rename/delete APIs, Unicode-aware
+normalization, category mutation audit events, safe document detachment, and
+document filtering by name, owner, category, creation date, state, sort order,
+and bounded pagination.
+
+**What was weak or wrong**
+
+A naive object-spread implementation could let a browser-supplied `ownerId`
+replace the owner-only predicate used for deleted documents. Treating the
+administrator role as universal category ownership would also exceed the
+existing least-privilege contract. Recording raw category names in audit events
+would retain unnecessary user data after rename or deletion.
+
+**What we chose instead**
+
+Combine state, access, and requested filters as separate members of one Prisma
+`AND` expression and test the exact deleted-owner bypass attempt. Derive category
+ownership only from the current session, give administrators no implicit
+cross-owner mutation power, and audit category decisions by opaque ID without
+storing names.
+
+**Commit evidence:** pending Phase 7 commits
+
 ## Entry template
 
 Copy this section for future material AI use:

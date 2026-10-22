@@ -14,6 +14,9 @@ Phase 5 introduced authentication, metadata, permission, activity, and chain
 verification evidence. Phase 6 extends the same writer to uploads, immutable
 versions, previews, downloads, administrator override, integrity failures, and
 external checkpoint creation.
+Phase 7 adds allowed and denied `CATEGORY_CREATE`, `CATEGORY_UPDATE`, and
+`CATEGORY_DELETE` evidence. Category names are deliberately omitted from audit
+metadata; the owner already has the current display value in the category table.
 
 ## Event integrity
 

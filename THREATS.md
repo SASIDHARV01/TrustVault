@@ -301,7 +301,8 @@ Phases 2–3 establish database controls and the authentication boundary. Phase
 READ/EDIT sharing. Phase 5 adds transaction-coupled audit writing, activity
 access, and chain verification. Phase 6 adds validated private content,
 immutable versions, per-request delivery authorization, failure compensation,
-administrator override evidence, and external chain-head checkpoints.
+administrator override evidence, and external chain-head checkpoints. Phase 7
+adds owner-scoped categories and authorization-composed document search.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -349,6 +350,10 @@ administrator override evidence, and external chain-head checkpoints.
 - TV-004 and TV-005: the action matrix denies unrelated users and prevents READ
   or EDIT recipients from performing owner-only operations. Unit tests evaluate
   every action for owner, reader, editor, unrelated user, and administrator.
+- TV-008: name, owner, category, date, state, and sort filters are joined to the
+  access predicate with `AND` in one database query. Counts use the same query;
+  foreign identifiers return empty results, and tests include deleted-state and
+  cross-owner filter probes.
 - TV-006: the server resolver selects only grants whose `revokedAt` is null and
   does not cache decisions. An isolated PostgreSQL test proves that revocation
   changes the very next download decision from allowed to denied.
@@ -386,6 +391,9 @@ administrator override evidence, and external chain-head checkpoints.
 - TV-017 and TV-020: strict grant schemas reject client-supplied issuer,
   recipient ID, revoker, document, and owner fields. Services derive security
   actors and outcomes from current server state.
+- TV-005 and TV-020: category ownership comes only from the session. Normalized
+  per-owner uniqueness is database-enforced, foreign category mutations use
+  non-revealing errors, and deletion detaches rather than deletes documents.
 - TV-018: grant creation, access-level replacement, and revocation require an
   Origin matching `APP_URL`.
 - TV-014: permission operations now record allowed and denied outcomes through

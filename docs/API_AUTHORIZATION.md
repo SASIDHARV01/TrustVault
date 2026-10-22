@@ -23,8 +23,13 @@ never loaded and filtered in application memory.
 
 Supported query parameters:
 
-- `q`: optional case-insensitive name search, at most 100 characters;
+- `q`: optional case-insensitive document-name search;
+- `owner` or `ownerId`: owner text or exact owner filter;
+- `category` or `categoryId`: category text or exact category filter;
+- `createdFrom` and `createdTo`: inclusive ISO 8601 date range;
 - `state`: `ACTIVE` by default or `DELETED`;
+- `sort`: `createdAt`, `updatedAt`, or `name`;
+- `order`: `asc` or `desc`;
 - `page`: one-based page number;
 - `limit`: 1–50, default 20.
 
@@ -32,6 +37,8 @@ Ordinary users see active documents they own or hold a current READ/EDIT grant
 for. Deleted-document grants are suspended, so ordinary users see only their own
 deleted documents. Administrators may list metadata for active or deleted
 documents but receive no content or mutation authority from that visibility.
+Every requested filter is combined with this access predicate using `AND`;
+filters cannot replace or weaken authorization. Counts use the identical query.
 
 ### `POST /api/documents`
 
