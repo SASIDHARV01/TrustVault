@@ -50,6 +50,9 @@ enum AuditAction {
   AUDIT_VIEW
   AUDIT_VERIFY
   AUDIT_CHECKPOINT_CREATE
+  CATEGORY_CREATE
+  CATEGORY_UPDATE
+  CATEGORY_DELETE
 }
 
 enum AuditOutcome {
@@ -64,6 +67,7 @@ enum AuditResource {
   PERMISSION
   AUDIT
   SYSTEM
+  CATEGORY
 }
 
 // Better Auth core model plus TrustVault's system-level role. Document owner,

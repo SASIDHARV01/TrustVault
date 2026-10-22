@@ -20,6 +20,9 @@ export const auditActions = [
   "AUDIT_VIEW",
   "AUDIT_VERIFY",
   "AUDIT_CHECKPOINT_CREATE",
+  "CATEGORY_CREATE",
+  "CATEGORY_UPDATE",
+  "CATEGORY_DELETE",
 ] as const;
 
 const optionalId = z
