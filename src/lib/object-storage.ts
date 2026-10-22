@@ -70,6 +70,20 @@ export function createDocumentObjectKey(
   return parseObjectStorageKey(`documents/${id.slice(0, 2)}/${id}`);
 }
 
+export function createAuditCheckpointObjectKey(
+  createId: () => string = randomUUID,
+): ObjectStorageKey {
+  const id = createId();
+  if (
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+      id,
+    )
+  ) {
+    throw new ObjectStorageError("INVALID_OBJECT_KEY");
+  }
+  return parseObjectStorageKey(`audit-checkpoints/${id.slice(0, 2)}/${id}`);
+}
+
 export function validatePutStoredObjectInput(input: PutStoredObjectInput) {
   if (!/^[a-f0-9]{64}$/.test(input.sha256)) {
     throw new ObjectStorageError("INVALID_OBJECT");

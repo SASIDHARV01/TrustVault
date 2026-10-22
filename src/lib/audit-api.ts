@@ -19,6 +19,7 @@ export const auditActions = [
   "ADMIN_OVERRIDE_READ",
   "AUDIT_VIEW",
   "AUDIT_VERIFY",
+  "AUDIT_CHECKPOINT_CREATE",
 ] as const;
 
 const optionalId = z
