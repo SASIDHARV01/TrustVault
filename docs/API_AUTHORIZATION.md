@@ -4,10 +4,10 @@ Last verified: 2026-10-22
 
 ## Phase 4.2 scope
 
-Phase 4.2 connects authenticated HTTP requests to the centralized document
+Phase 4.2 connected authenticated HTTP requests to the centralized document
 authorization kernel. It provides metadata creation, discovery, inspection,
-update, soft deletion, and restoration. It does not upload, preview, stream, or
-download document bytes, manage grants, or write the audit hash chain.
+update, soft deletion, and restoration. Phase 6 adds the content endpoints below;
+grant management and audit APIs are documented separately.
 
 Every response is private and non-cacheable and includes an `X-Request-ID`
 header. The identifier will correlate these operations with audit events when
@@ -40,8 +40,22 @@ fields are `name`, optional `description`, and optional `categoryId`. Ownership,
 state, deletion fields, and timestamps cannot be supplied by a browser. A
 category is accepted only when it belongs to the new document owner.
 
-This creates metadata only. R2 upload and the first immutable version belong to
-the storage phase.
+This creates metadata only. Upload the first immutable version through the
+versions endpoint after this record is created.
+
+### `GET|POST /api/documents/:documentId/versions`
+
+`GET` lists READY immutable versions after a current metadata authorization
+check. `POST` accepts one validated multipart `file` from the owner or an active
+EDIT recipient. Both paths re-read authorization; the response omits object
+keys and provider details.
+
+### `GET /api/documents/:documentId/versions/:versionId/content`
+
+Streams verified private bytes after a current PREVIEW or DOWNLOAD decision.
+Use `?disposition=attachment` for download. Administrators without a normal
+grant must supply a valid `X-TrustVault-Override-Reason`; the override is audited
+and never grants mutation power.
 
 ### `GET /api/documents/:documentId`
 

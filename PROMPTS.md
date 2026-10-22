@@ -413,6 +413,41 @@ scope remain deployment checks rather than locally proven facts.
 
 **Commit evidence:** pending Phase 6.1 commits
 
+## 2026-10-22 — 14 — Complete Phase 6 secure document lifecycle
+
+**What was asked**
+
+Complete all remaining Phase 6 work at once while retaining the pre-commit
+review, interview explanation, and security-first project contract.
+
+**What the AI produced**
+
+It added strict PDF/PNG/JPEG validation, staged private uploads, immutable
+versions, authorized version history and content delivery, immediate revocation,
+reason-bearing administrator override, actual-byte digest verification, upload
+failure compensation, locked-prefix audit checkpoints, and unit/API/PostgreSQL
+adversarial coverage.
+
+**What was weak or wrong**
+
+The first checkpoint key ended in `.json`, but the established storage-key
+allowlist intentionally rejected dots. The first full database run also let two
+integration files write one global audit chain in parallel with different test
+HMAC keys, correctly making the combined chain unverifiable. A metadata-only
+download check would not have detected bytes overwritten while retaining forged
+metadata.
+
+**What we chose instead**
+
+Use extensionless random checkpoint keys while preserving JSON content type,
+serialize database test files around the single production-shaped chain, and
+reuse one deterministic test key. Bound every content read by the expected size
+and recompute SHA-256 over the actual bytes before returning them. Require a
+Cloudflare bucket-lock rule on `audit-checkpoints/` before claiming independent
+production immutability.
+
+**Commit evidence:** pending Phase 6 commits
+
 ## Entry template
 
 Copy this section for future material AI use:

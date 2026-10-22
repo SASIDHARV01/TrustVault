@@ -6,16 +6,17 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. Production deployment to Render and the Cloudflare domain is intentionally scheduled for the final implementation phase.
 
-Phases 0–5 currently provide the security contract, public web foundation,
+Phases 0–6 currently provide the security contract, public web foundation,
 validated PostgreSQL data model, Better Auth credentials and sessions, protected
 member/admin routes, repeatable demo identities, centralized per-document
 authorization, authorized document metadata APIs, and owner-controlled named-user
 READ/EDIT sharing. Phase 5 adds transaction-coupled allowed/denied audit events,
 an HMAC-linked append-only chain, owner/admin activity APIs, and administrator
-integrity verification. Phase 6.1 adds a private Cloudflare R2 boundary, strict
-server-only configuration, unguessable object keys, and an in-memory test
-provider. Browser upload/download workflows, independent R2 chain-head
-checkpoints, activity screens, and deployment are not implemented yet.
+integrity verification. Phase 6 completes private R2-backed uploads, immutable
+versions, authorized preview/download, immediate content revocation, audited
+administrator override, failure compensation, actual-byte SHA-256 verification,
+and locked-prefix audit checkpoints. Product screens, live R2 verification,
+search/categories, hardening, and deployment remain upcoming phases.
 
 ## Security invariants
 
@@ -85,7 +86,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) explains exact-email recipient lookup, owner-only sharing, history-preserving permission changes, and revocation.
 - [`docs/AUDIT.md`](docs/AUDIT.md) explains event coverage, HMAC chaining, transactional writes, activity authorization, verification, and the external-checkpoint boundary.
 - [`docs/STORAGE.md`](docs/STORAGE.md) defines the private R2 boundary, key strategy, least-privilege configuration, and current verification limits.
-- Storage API documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
+- Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development
 

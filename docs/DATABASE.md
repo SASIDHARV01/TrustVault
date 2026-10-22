@@ -67,13 +67,13 @@ allow/deny/failure outcome, request context, previous hash, event hash, and HMAC
 key version. Actor and document relations are optional so refused anonymous or
 unknown-target requests can still be recorded.
 
-`AuditCheckpoint` links a chain head to the future locked R2 checkpoint object.
+`AuditCheckpoint` links a chain head to its locked-prefix R2 checkpoint object.
 PostgreSQL triggers reject updates and deletes on both audit tables. Phase 5 adds
 serialized HMAC-chain writes and full-chain verification. Audit actor/document
 foreign keys use deletion restriction because setting them to null would mutate
 immutable evidence; account disable and document soft deletion preserve history.
 
-Independent R2 chain-head checkpoint writing is still intentionally pending. An
+Independent R2 chain-head checkpoint writing is implemented in Phase 6. An
 internally valid database chain alone cannot prove that a privileged database
 operator did not truncate its newest events.
 
@@ -87,6 +87,8 @@ The initial SQL migration adds constraints that Prisma cannot express directly:
 - soft-delete state, timestamp, and actor must agree;
 - document version and byte size must be positive;
 - version and audit hashes must be lowercase 64-character hexadecimal values;
+- document version metadata is immutable with allowlisted storage-state
+  transitions only; and
 - audit events and checkpoints are append-only.
 
 Application validation will provide friendly errors, but these constraints remain

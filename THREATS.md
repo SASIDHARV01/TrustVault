@@ -299,8 +299,9 @@ Each identifier is stable and will be referenced by automated tests.
 Phases 2–3 establish database controls and the authentication boundary. Phase
 4 adds the centralized decision kernel, metadata routes, and owner-controlled
 READ/EDIT sharing. Phase 5 adds transaction-coupled audit writing, activity
-access, and chain verification. Content storage and independent R2 chain-head
-checkpoints remain unfinished.
+access, and chain verification. Phase 6 adds validated private content,
+immutable versions, per-request delivery authorization, failure compensation,
+administrator override evidence, and external chain-head checkpoints.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -319,7 +320,11 @@ checkpoints remain unfinished.
 - TV-022: runtime auth settings use server-only environment variables, the
   repository contains placeholders only, and the production build remains
   independent from live credentials without weakening runtime checks.
-- TV-010 and TV-022: Phase 6.1 introduces a server-only R2 adapter with no
+- TV-009: Phase 6 accepts only PDF, PNG, and JPEG up to 10 MiB, checks one safe
+  extension against the declared MIME and magic bytes, rejects traversal,
+  control characters, empty files, and double extensions, and calculates the
+  digest server-side.
+- TV-010 and TV-022: Phase 6 uses a server-only R2 adapter with no
   public-ACL or presigned-URL operation. Object keys are random and contain no
   document, owner, email, or filename data. Configuration derives an HTTPS R2
   endpoint from a validated account ID and jurisdiction, rejects placeholders,
@@ -332,7 +337,8 @@ checkpoints remain unfinished.
   writer; verification detects changed fields, missing middle events, reordering,
   and unknown key versions. PostgreSQL rejects event updates/deletes. A live test
   proves concurrent writers form one valid chain. Detection of privileged tail
-  truncation remains dependent on the planned locked R2 head checkpoint.
+  truncation can be compared with Phase 6 R2 head checkpoints once production
+  enables the documented indefinite bucket lock on `audit-checkpoints/`.
 - TV-016: audit metadata is explicitly constructed rather than copied from
   requests, activity responses omit internal chain/network fields, and tests
   search stored payloads for representative password, cookie, and document-body
@@ -384,21 +390,29 @@ checkpoints remain unfinished.
   Origin matching `APP_URL`.
 - TV-014: permission operations now record allowed and denied outcomes through
   the transaction-coupled audit writer introduced in Phase 5.
+- TV-004, TV-006, and TV-007: version history and content delivery re-read the
+  current grant on each request. Revocation blocks the next request, inaccessible
+  versions use non-enumerating errors, and administrators need a validated,
+  audited override reason without gaining mutation powers.
+- TV-012 and TV-013: upload uses explicit PENDING/READY/FAILED states and
+  compensating object deletion. Content is server-proxied with private/no-store
+  headers and actual-byte SHA-256 verification before delivery.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.
-- TV-012: document versions record explicit `PENDING`, `READY`, `FAILED`, and
-  `DELETED` storage states for later compensating workflows.
+- TV-012: document versions use explicit `PENDING`, `READY`, `FAILED`, and
+  `DELETED` storage states in implemented compensating workflows.
 - TV-015: PostgreSQL triggers reject `UPDATE` and `DELETE` against audit events
-  and checkpoints, and Phase 5 adds serialized chained-HMAC writing and
-  verification. The separately locked R2 checkpoint job remains future work.
+  and checkpoints. Phase 6 writes verified chain heads to the R2 checkpoint
+  prefix; independent immutability depends on the documented production bucket
+  lock and remains unverified until deployment.
 - TV-020: foreign keys, uniqueness rules, positive size/version checks, deletion
   consistency, revocation consistency, and hash-format checks reject malformed
   relational states independently of the browser.
-- The initial migration was applied to an isolated PostgreSQL 15 instance. Live
-  adversarial checks confirmed rejection of duplicate active grants,
-  inconsistent soft deletion, invalid hashes, audit updates, and checkpoint
-  deletion.
+- All three migrations were applied to an isolated PostgreSQL 15 instance. Live
+  adversarial checks confirmed grant/content role boundaries, immediate
+  revocation, collision-free concurrent version numbering, failure states,
+  integrity refusal, and rejection of audit/checkpoint mutations.
 
 ## Review rule
 

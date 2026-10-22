@@ -10,10 +10,10 @@ allowed or denied it, why the policy reached that decision, and which request
 produced the event. It never stores passwords, session cookies, document bytes,
 or unrestricted request bodies.
 
-Phase 5 covers authentication, document-metadata, permission-management, audit-
-view, and audit-verification activity. Upload, preview, download, immutable
-versions, and administrator override events will use the same writer when those
-features are implemented.
+Phase 5 introduced authentication, metadata, permission, activity, and chain
+verification evidence. Phase 6 extends the same writer to uploads, immutable
+versions, previews, downloads, administrator override, integrity failures, and
+external checkpoint creation.
 
 ## Event integrity
 
@@ -80,12 +80,11 @@ and missing or reordered events inside the chain. Database triggers also stop
 ordinary application and database clients from mutating audit evidence.
 
 A privileged database operator who can disable triggers could remove the newest
-event and leave a shorter internally valid chain. Detecting that tail deletion
-requires comparison with a chain-head checkpoint held outside PostgreSQL. The
-schema reserves `AuditCheckpoint`; writing signed chain heads to locked private
-Cloudflare R2 is part of the storage phase. Until that independent checkpoint is
-enabled, TrustVault must not claim protection from a database-superuser tail-
-truncation attack.
+event and leave a shorter internally valid chain. Phase 6 can checkpoint a
+verified chain head to the private `audit-checkpoints/` R2 prefix. Production
+must enable a Cloudflare bucket-lock rule on that prefix; without that deployment
+control, the external object is not independently immutable and TrustVault must
+not claim database-superuser tail-truncation protection.
 
 ## Verification evidence
 
@@ -103,6 +102,7 @@ Phase 5 automated checks cover:
 - absence of representative passwords, cookies, and document content in stored
   audit payloads.
 
-The live suite uses an isolated PostgreSQL 15 database. It does not prove the
-future R2 checkpoint, document-byte events, deployed Supabase permissions, or
-production secret management.
+The live suite uses an isolated PostgreSQL 15 database and an in-memory object
+provider to prove checkpoint and document-byte workflows. It does not prove live
+R2 lock/privacy policy, deployed Supabase permissions, or production secret
+management.
