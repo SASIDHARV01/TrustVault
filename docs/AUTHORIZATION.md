@@ -115,6 +115,13 @@ document HTTP routes, user-facing document screens, permission mutations, R2
 storage, or audit-chain writes. Those consumers will be built in later reviewed
 sub-phases and must call this kernel.
 
+Phase 4.2 now uses the kernel for document metadata detail, update, deletion, and
+restoration. Its list service expresses equivalent discovery rules directly in
+the PostgreSQL query so inaccessible rows are never fetched. See
+`docs/API_AUTHORIZATION.md` for the HTTP contract. Permission mutations, R2
+content operations, user-facing document screens, and audit-chain writes remain
+outside this phase.
+
 ## Verification
 
 The unit suite exhaustively evaluates active owner, READ, EDIT, unrelated,

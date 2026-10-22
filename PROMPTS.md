@@ -280,6 +280,39 @@ by default, and reserve detailed decision reasons for services and audit records
 
 **Commit evidence:** [1c9fdc3](../../commit/1c9fdc3), [f3eafe7](../../commit/f3eafe7)
 
+## 2026-10-22 — 10 — Phase 4.2 authorized document metadata APIs
+
+**What was asked**
+
+Build all Phase 4.2 parts together: API security helpers, authorized discovery,
+metadata creation/detail/update/delete/restore, and adversarial API tests.
+
+**What the AI produced**
+
+It added strict request schemas, session-derived API actors, trusted-origin
+checks, request IDs, database-scoped discovery, authorization-aware transactional
+services, Next.js route handlers, non-enumerating errors, focused unit tests,
+live PostgreSQL adversarial journeys, and an API security contract.
+
+**What was weak or wrong**
+
+The first paginated-list implementation used Prisma's array transaction form.
+Although tests passed, the PostgreSQL driver emitted a future-compatibility
+warning. More importantly, filtering document rows after fetching them or
+trusting owner/state fields from JSON would have created authorization and mass-
+assignment vulnerabilities.
+
+**What we chose instead**
+
+Apply discovery conditions inside PostgreSQL before search and pagination,
+derive actor and ownership from the current session, reject unknown JSON fields,
+use repeatable-read/serializable transactions for authorized operations, and
+return the same public result for malformed, missing, revoked, and inaccessible
+document identifiers. Paginated reads are sequential inside one transaction;
+the remaining warning traces to the pinned Prisma adapter's transaction I/O.
+
+**Commit evidence:** [27efc0c](../../commit/27efc0c), [b79f999](../../commit/b79f999), [d87c596](../../commit/d87c596)
+
 ## Entry template
 
 Copy this section for future material AI use:

@@ -1,6 +1,6 @@
 # TrustVault Threat Model
 
-Last reviewed: 2026-10-21
+Last reviewed: 2026-10-22
 
 This document is a living security contract for TrustVault. A feature is not
 complete until its relevant threats have an enforcement point and an automated
@@ -296,9 +296,10 @@ Each identifier is stable and will be referenced by automated tests.
 
 ## Current implementation evidence
 
-Phases 2–3 establish database controls and the authentication boundary. They do
-not claim that document HTTP routes or audit hashing are finished. Phase 4.1
-adds the centralized document decision kernel those routes must call.
+Phases 2–3 establish database controls and the authentication boundary. Phase
+4.1 adds the centralized document decision kernel. Phase 4.2 connects that
+kernel to metadata HTTP routes; content storage, permission routes, and audit
+hash-chain writing remain unfinished.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -326,8 +327,25 @@ adds the centralized document decision kernel those routes must call.
 - TV-007: administrators receive metadata/activity visibility but no automatic
   content, edit, delete, restore, or sharing power. Content requires the distinct
   reason-bearing `ADMIN_OVERRIDE_READ` decision.
-- TV-008: decision reasons remain internal; future routes must map missing and
-  inaccessible documents to the same non-revealing client response.
+- TV-001: every document metadata route loads the current PostgreSQL-backed
+  actor and returns 401 when it is absent.
+- TV-004, TV-005, and TV-011: detail and mutation services call the centralized
+  action policy. PostgreSQL API tests prove READ cannot update, EDIT can update
+  but cannot delete, only owners can delete/restore, and administrators cannot
+  mutate by role alone.
+- TV-006: metadata reads resolve only current non-revoked grants. The API test
+  proves that revoking READ changes the next detail request from 200 to the
+  non-revealing 404.
+- TV-008: discovery access is expressed inside the PostgreSQL query before name
+  search and pagination. Malformed, missing, revoked, unrelated, and otherwise
+  inaccessible detail IDs share the same public 404 body.
+- TV-013: all metadata responses use `Cache-Control: private, no-store` and
+  `Vary: Cookie`.
+- TV-018: document POST, PATCH, DELETE, and restore requests require an Origin
+  matching `APP_URL`; a unit test rejects an untrusted origin.
+- TV-020 and TV-021: strict schemas reject ownership/state mass assignment,
+  unknown filters, path-like IDs, oversized metadata, bodies above 64 KiB, and
+  pagination limits above 50.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.
