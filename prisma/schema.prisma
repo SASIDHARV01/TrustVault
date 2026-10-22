@@ -33,6 +33,8 @@ enum StorageState {
 enum AuditAction {
   AUTH_SIGN_IN
   AUTH_SIGN_OUT
+  DOCUMENT_CREATE
+  DOCUMENT_METADATA_READ
   DOCUMENT_UPLOAD
   DOCUMENT_READ
   DOCUMENT_DOWNLOAD
@@ -41,9 +43,11 @@ enum AuditAction {
   DOCUMENT_RESTORE
   DOCUMENT_VERSION_CREATE
   PERMISSION_GRANT
+  PERMISSION_LIST
   PERMISSION_UPDATE
   PERMISSION_REVOKE
   ADMIN_OVERRIDE_READ
+  AUDIT_VIEW
   AUDIT_VERIFY
 }
 
@@ -237,8 +241,8 @@ model AuditEvent {
   hmacKeyVersion Int           @default(1)
   occurredAt     DateTime      @default(now()) @db.Timestamptz(6)
 
-  actor      User?            @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  document   Document?        @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  actor      User?            @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  document   Document?        @relation(fields: [documentId], references: [id], onDelete: Restrict)
   checkpoint AuditCheckpoint?
 
   @@index([actorId, occurredAt(sort: Desc)])
