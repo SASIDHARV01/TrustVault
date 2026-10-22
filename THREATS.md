@@ -319,6 +319,11 @@ checkpoints remain unfinished.
 - TV-022: runtime auth settings use server-only environment variables, the
   repository contains placeholders only, and the production build remains
   independent from live credentials without weakening runtime checks.
+- TV-010 and TV-022: Phase 6.1 introduces a server-only R2 adapter with no
+  public-ACL or presigned-URL operation. Object keys are random and contain no
+  document, owner, email, or filename data. Configuration derives an HTTPS R2
+  endpoint from a validated account ID and jurisdiction, rejects placeholders,
+  and documents a bucket-scoped Object Read & Write token.
 - TV-014: authentication, document-metadata, permission-management, activity-
   view, and verification paths now record server-derived allowed/denied events.
   Document and permission mutations share the transaction with their audit
@@ -377,17 +382,16 @@ checkpoints remain unfinished.
   actors and outcomes from current server state.
 - TV-018: grant creation, access-level replacement, and revocation require an
   Origin matching `APP_URL`.
-- TV-014 remains open: request IDs prepare permission operations for audit
-  correlation, but the tamper-evident writer must still record allowed and
-  denied grant actions before production readiness.
+- TV-014: permission operations now record allowed and denied outcomes through
+  the transaction-coupled audit writer introduced in Phase 5.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.
 - TV-012: document versions record explicit `PENDING`, `READY`, `FAILED`, and
   `DELETED` storage states for later compensating workflows.
 - TV-015: PostgreSQL triggers reject `UPDATE` and `DELETE` against audit events
-  and checkpoints. Hash columns and constraints exist; the chained-HMAC writer
-  and locked R2 checkpoint job remain future work.
+  and checkpoints, and Phase 5 adds serialized chained-HMAC writing and
+  verification. The separately locked R2 checkpoint job remains future work.
 - TV-020: foreign keys, uniqueness rules, positive size/version checks, deletion
   consistency, revocation consistency, and hash-format checks reject malformed
   relational states independently of the browser.

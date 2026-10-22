@@ -12,7 +12,9 @@ member/admin routes, repeatable demo identities, centralized per-document
 authorization, authorized document metadata APIs, and owner-controlled named-user
 READ/EDIT sharing. Phase 5 adds transaction-coupled allowed/denied audit events,
 an HMAC-linked append-only chain, owner/admin activity APIs, and administrator
-integrity verification. Document byte storage, independent R2 chain-head
+integrity verification. Phase 6.1 adds a private Cloudflare R2 boundary, strict
+server-only configuration, unguessable object keys, and an in-memory test
+provider. Browser upload/download workflows, independent R2 chain-head
 checkpoints, activity screens, and deployment are not implemented yet.
 
 ## Security invariants
@@ -82,6 +84,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/API_AUTHORIZATION.md`](docs/API_AUTHORIZATION.md) documents the authenticated document metadata endpoints and their security behavior.
 - [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) explains exact-email recipient lookup, owner-only sharing, history-preserving permission changes, and revocation.
 - [`docs/AUDIT.md`](docs/AUDIT.md) explains event coverage, HMAC chaining, transactional writes, activity authorization, verification, and the external-checkpoint boundary.
+- [`docs/STORAGE.md`](docs/STORAGE.md) defines the private R2 boundary, key strategy, least-privilege configuration, and current verification limits.
 - Storage API documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development

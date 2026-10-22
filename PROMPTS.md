@@ -381,6 +381,38 @@ tail truncation.
 
 **Commit evidence:** pending Phase 5 commits
 
+## 2026-10-22 — 13 — Phase 6.1 private R2 storage boundary
+
+**What was asked**
+
+Begin the secure-document-storage branch with the private storage foundation,
+while retaining medium commits, explanation, tests, and pre-commit review.
+
+**What the AI produced**
+
+It added the official AWS SDK v3 S3 client, strict Cloudflare R2 configuration,
+derived jurisdiction-aware endpoints, a provider-independent object-store
+contract, random document object keys, an R2 implementation, an in-memory test
+implementation, focused tests, and storage security documentation.
+
+**What was weak or wrong**
+
+The original environment template accepted a complete `R2_ENDPOINT`. That is
+unnecessarily flexible for this product and could redirect confidential bytes to
+an unintended host after a configuration mistake. A cloud-only implementation
+would also make authorization and failure testing slow and dependent on real
+credentials.
+
+**What we chose instead**
+
+Derive the endpoint from a validated 32-character Cloudflare account ID and an
+allowlisted jurisdiction. Keep the production adapter lazy and server-only, add
+a deterministic in-memory implementation for later adversarial tests, expose no
+list or presigned-URL operation, and document that live bucket privacy and token
+scope remain deployment checks rather than locally proven facts.
+
+**Commit evidence:** pending Phase 6.1 commits
+
 ## Entry template
 
 Copy this section for future material AI use:
