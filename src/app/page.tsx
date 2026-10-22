@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { BrandMark } from "@/components/brand-mark";
 import { siteConfig } from "@/lib/site-config";
 
@@ -48,7 +50,10 @@ export default function Home() {
             </a>
           ))}
         </div>
-        <span className="phase-pill">Building in public · Phase 1</span>
+        <div className="nav__auth">
+          <Link href="/login">Sign in</Link>
+          <Link className="button button--primary" href="/register">Open your vault</Link>
+        </div>
       </nav>
 
       <section className="hero shell" id="top">
@@ -65,9 +70,9 @@ export default function Home() {
             trail built to reveal tampering.
           </p>
           <div className="hero__actions">
-            <a className="button button--primary" href="#workflow">
-              Explore the workflow <ArrowIcon />
-            </a>
+            <Link className="button button--primary" href="/register">
+              Create secure account <ArrowIcon />
+            </Link>
             <a className="button button--ghost" href="#security">
               Read the security promise
             </a>
