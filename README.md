@@ -6,12 +6,14 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. Production deployment to Render and the Cloudflare domain is intentionally scheduled for the final implementation phase.
 
-Phases 0–4.3 currently provide the security contract, public web foundation,
+Phases 0–5 currently provide the security contract, public web foundation,
 validated PostgreSQL data model, Better Auth credentials and sessions, protected
 member/admin routes, repeatable demo identities, centralized per-document
 authorization, authorized document metadata APIs, and owner-controlled named-user
-READ/EDIT sharing. Document byte storage, audit-chain writing, and deployment are
-not implemented yet.
+READ/EDIT sharing. Phase 5 adds transaction-coupled allowed/denied audit events,
+an HMAC-linked append-only chain, owner/admin activity APIs, and administrator
+integrity verification. Document byte storage, independent R2 chain-head
+checkpoints, activity screens, and deployment are not implemented yet.
 
 ## Security invariants
 
@@ -79,6 +81,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/AUTHORIZATION.md`](docs/AUTHORIZATION.md) defines the deny-by-default per-document action matrix and immediate-revocation contract.
 - [`docs/API_AUTHORIZATION.md`](docs/API_AUTHORIZATION.md) documents the authenticated document metadata endpoints and their security behavior.
 - [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) explains exact-email recipient lookup, owner-only sharing, history-preserving permission changes, and revocation.
+- [`docs/AUDIT.md`](docs/AUDIT.md) explains event coverage, HMAC chaining, transactional writes, activity authorization, verification, and the external-checkpoint boundary.
 - Storage API documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development

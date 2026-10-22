@@ -297,9 +297,10 @@ Each identifier is stable and will be referenced by automated tests.
 ## Current implementation evidence
 
 Phases 2–3 establish database controls and the authentication boundary. Phase
-4.1 adds the centralized document decision kernel. Phase 4.2 connects that
-kernel to metadata HTTP routes. Phase 4.3 adds owner-controlled READ/EDIT grant
-routes; content storage and audit hash-chain writing remain unfinished.
+4 adds the centralized decision kernel, metadata routes, and owner-controlled
+READ/EDIT sharing. Phase 5 adds transaction-coupled audit writing, activity
+access, and chain verification. Content storage and independent R2 chain-head
+checkpoints remain unfinished.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -318,6 +319,22 @@ routes; content storage and audit hash-chain writing remain unfinished.
 - TV-022: runtime auth settings use server-only environment variables, the
   repository contains placeholders only, and the production build remains
   independent from live credentials without weakening runtime checks.
+- TV-014: authentication, document-metadata, permission-management, activity-
+  view, and verification paths now record server-derived allowed/denied events.
+  Document and permission mutations share the transaction with their audit
+  write, and a live test proves the mutation rolls back when signing fails.
+- TV-015: HMAC-SHA-256 events are deterministically linked under a serialized
+  writer; verification detects changed fields, missing middle events, reordering,
+  and unknown key versions. PostgreSQL rejects event updates/deletes. A live test
+  proves concurrent writers form one valid chain. Detection of privileged tail
+  truncation remains dependent on the planned locked R2 head checkpoint.
+- TV-016: audit metadata is explicitly constructed rather than copied from
+  requests, activity responses omit internal chain/network fields, and tests
+  search stored payloads for representative password, cookie, and document-body
+  secrets.
+- TV-017: actor identity and outcome come from the server session and policy
+  result. Request IDs are server-generated; IP address and user agent come from
+  bounded request headers. The audit APIs accept only allowlisted filters.
 - TV-004 and TV-005: the action matrix denies unrelated users and prevents READ
   or EDIT recipients from performing owner-only operations. Unit tests evaluate
   every action for owner, reader, editor, unrelated user, and administrator.

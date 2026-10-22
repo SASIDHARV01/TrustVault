@@ -345,6 +345,42 @@ the audit writer as an explicit remaining production dependency.
 
 **Commit evidence:** [26e9795](../../commit/26e9795), [8bb5977](../../commit/8bb5977), [8dc4e0f](../../commit/8dc4e0f)
 
+## 2026-10-22 — 12 — Phase 5 tamper-evident audit trail
+
+**What was asked**
+
+Continue from the completed document-authorization phase and implement the next
+phase while preserving the explain-before-commit workflow.
+
+**What the AI produced**
+
+It added versioned HMAC-SHA-256 event chaining, serialized PostgreSQL writers,
+transaction-coupled document and permission auditing, authentication events,
+owner/admin activity endpoints, administrator chain verification, strict query
+filters, unit tests, live adversarial PostgreSQL tests, and the audit security
+contract.
+
+**What was weak or wrong**
+
+The first verifier accidentally passed the database-only `BigInt` row ID into
+the canonical JSON payload, which both changed the signed shape and could not be
+serialized. The first concurrent writer relied on serializable isolation without
+retrying PostgreSQL conflicts. The original audit foreign keys used `ON DELETE
+SET NULL`, but nulling a relation would update a row that the immutability trigger
+correctly rejects.
+
+**What we chose instead**
+
+Reconstruct the exact allowlisted signed payload during verification, use a
+transaction advisory lock plus shared bounded serialization retry, and restrict physical
+deletion of referenced actors/documents while retaining account disable and
+document soft deletion. Add a live rollback test proving a protected mutation
+cannot commit when its audit signature cannot be created. Document honestly that
+an independent R2 chain-head checkpoint is still required to detect privileged
+tail truncation.
+
+**Commit evidence:** pending Phase 5 commits
+
 ## Entry template
 
 Copy this section for future material AI use:

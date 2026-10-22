@@ -68,8 +68,14 @@ key version. Actor and document relations are optional so refused anonymous or
 unknown-target requests can still be recorded.
 
 `AuditCheckpoint` links a chain head to the future locked R2 checkpoint object.
-PostgreSQL triggers reject updates and deletes on both audit tables. The audit
-service will add serialized HMAC-chain writes in a later phase.
+PostgreSQL triggers reject updates and deletes on both audit tables. Phase 5 adds
+serialized HMAC-chain writes and full-chain verification. Audit actor/document
+foreign keys use deletion restriction because setting them to null would mutate
+immutable evidence; account disable and document soft deletion preserve history.
+
+Independent R2 chain-head checkpoint writing is still intentionally pending. An
+internally valid database chain alone cannot prove that a privileged database
+operator did not truncate its newest events.
 
 ## Database-enforced invariants
 
