@@ -20,17 +20,20 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
+    "db:seed:demo": "tsx scripts/seed-demo-users.ts",
     "check": "npm run db:validate && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "better-auth": "^1.7.12",
     "dotenv": "^18.0.8",
     "next": "^16.4.2",
     "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -39,6 +42,7 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^9.39.5",
     "prisma": "^7.10.1",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"

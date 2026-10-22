@@ -29,3 +29,23 @@ export function getDatabase() {
 
   return globalDatabase.trustVaultPrisma;
 }
+
+// Libraries such as Better Auth accept a Prisma-shaped object during module
+// initialization. This proxy preserves that shape without reading DATABASE_URL
+// until the first real database operation runs.
+export function getLazyDatabase() {
+  return new Proxy({} as PrismaClient, {
+    get(_target, property) {
+      // The auth adapter optionally reads this during startup for a schema
+      // warning. Returning undefined skips that nonessential eager inspection.
+      if (property === "_runtimeDataModel") {
+        return undefined;
+      }
+
+      const database = getDatabase();
+      const value = Reflect.get(database, property);
+
+      return typeof value === "function" ? value.bind(database) : value;
+    },
+  });
+}
