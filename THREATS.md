@@ -298,8 +298,8 @@ Each identifier is stable and will be referenced by automated tests.
 
 Phases 2–3 establish database controls and the authentication boundary. Phase
 4.1 adds the centralized document decision kernel. Phase 4.2 connects that
-kernel to metadata HTTP routes; content storage, permission routes, and audit
-hash-chain writing remain unfinished.
+kernel to metadata HTTP routes. Phase 4.3 adds owner-controlled READ/EDIT grant
+routes; content storage and audit hash-chain writing remain unfinished.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -346,6 +346,23 @@ hash-chain writing remain unfinished.
 - TV-020 and TV-021: strict schemas reject ownership/state mass assignment,
   unknown filters, path-like IDs, oversized metadata, bodies above 64 KiB, and
   pagination limits above 50.
+- TV-004 and TV-005: every permission route evaluates `MANAGE_GRANTS` inside its
+  transaction. PostgreSQL tests prove READ, EDIT, unrelated, and administrator
+  actors cannot list, create, change, or revoke another owner's grants.
+- TV-006: grant revocation preserves the row but removes it from current access
+  checks. A live permission-to-document API journey proves the next metadata
+  request changes from 200 to the non-revealing 404.
+- TV-008: recipient discovery requires one exact valid email rather than broad
+  directory search. Disabled, missing, and self-recipient cases share the same
+  public response and do not expose role or account status.
+- TV-017 and TV-020: strict grant schemas reject client-supplied issuer,
+  recipient ID, revoker, document, and owner fields. Services derive security
+  actors and outcomes from current server state.
+- TV-018: grant creation, access-level replacement, and revocation require an
+  Origin matching `APP_URL`.
+- TV-014 remains open: request IDs prepare permission operations for audit
+  correlation, but the tamper-evident writer must still record allowed and
+  denied grant actions before production readiness.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.

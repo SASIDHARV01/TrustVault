@@ -122,6 +122,11 @@ the PostgreSQL query so inaccessible rows are never fetched. See
 content operations, user-facing document screens, and audit-chain writes remain
 outside this phase.
 
+Phase 4.3 now uses `MANAGE_GRANTS` for owner-only grant listing, creation,
+READ/EDIT replacement, and revocation. See `docs/PERMISSIONS.md`. R2 content
+operations, user-facing document screens, and audit-chain writes remain outside
+the completed authorization phases.
+
 ## Verification
 
 The unit suite exhaustively evaluates active owner, READ, EDIT, unrelated,

@@ -313,6 +313,38 @@ the remaining warning traces to the pinned Prisma adapter's transaction I/O.
 
 **Commit evidence:** [27efc0c](../../commit/27efc0c), [b79f999](../../commit/b79f999), [d87c596](../../commit/d87c596)
 
+## 2026-10-22 — 11 — Phase 4.3 owner-controlled document sharing
+
+**What was asked**
+
+Implement the complete Phase 4.3 permission-management phase at once, including
+recipient discovery, grant services, HTTP routes, security tests, and docs.
+
+**What the AI produced**
+
+It added exact-email eligible-recipient lookup, owner-only grant history,
+READ/EDIT creation, history-preserving access replacement, soft revocation,
+strict HTTP handlers, nested Next.js routes, focused tests, live PostgreSQL
+adversarial journeys, and a permission security contract.
+
+**What was weak or wrong**
+
+Updating an access-level column in place would erase evidence of what permission
+existed previously. Broad recipient search would expose the user directory, and
+allowing administrator role alone to manage sharing would contradict least
+privilege. Permission routes without an audit writer are also not yet production
+complete.
+
+**What we chose instead**
+
+Require one exact normalized email, hide disabled/self/missing distinctions,
+derive all security actors server-side, authorize only the owner through
+`MANAGE_GRANTS`, and replace access atomically by revoking the prior row before
+creating its successor. Keep request IDs ready for audit correlation and record
+the audit writer as an explicit remaining production dependency.
+
+**Commit evidence:** [26e9795](../../commit/26e9795), [8bb5977](../../commit/8bb5977), [8dc4e0f](../../commit/8dc4e0f)
+
 ## Entry template
 
 Copy this section for future material AI use:
