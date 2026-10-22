@@ -124,20 +124,52 @@ export async function listAccessibleDocuments(
             ],
           };
 
-  const where: Prisma.DocumentWhereInput = {
-    state: query.state,
-    ...accessFilter,
+  const requestedFilters: Prisma.DocumentWhereInput = {
     ...(query.q
       ? { name: { contains: query.q, mode: "insensitive" as const } }
       : {}),
+    ...(query.ownerId ? { ownerId: query.ownerId } : {}),
+    ...(query.owner
+      ? {
+          owner: {
+            OR: [
+              { name: { contains: query.owner, mode: "insensitive" as const } },
+              { email: { contains: query.owner, mode: "insensitive" as const } },
+            ],
+          },
+        }
+      : {}),
+    ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+    ...(query.category
+      ? {
+          category: {
+            name: { contains: query.category, mode: "insensitive" as const },
+          },
+        }
+      : {}),
+    ...(query.createdFrom || query.createdTo
+      ? {
+          createdAt: {
+            ...(query.createdFrom ? { gte: new Date(query.createdFrom) } : {}),
+            ...(query.createdTo ? { lte: new Date(query.createdTo) } : {}),
+          },
+        }
+      : {}),
+  };
+  const where: Prisma.DocumentWhereInput = {
+    AND: [{ state: query.state }, accessFilter, requestedFilters],
   };
   const skip = (query.page - 1) * query.limit;
+  const orderBy = [
+    { [query.sort]: query.order },
+    { id: query.order },
+  ] satisfies Prisma.DocumentOrderByWithRelationInput[];
 
   return database.$transaction(
     async (transaction) => {
       const rows = await transaction.document.findMany({
         where,
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy,
         skip,
         take: query.limit,
         select: {

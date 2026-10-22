@@ -14,6 +14,14 @@ const documentDescription = z
 
 const categoryId = z.string().trim().min(1).max(128).nullable();
 
+const optionalSearchText = (maximum: number) =>
+  z
+    .string()
+    .trim()
+    .max(maximum)
+    .transform((value) => value || undefined)
+    .optional();
+
 export const documentIdSchema = z
   .string()
   .trim()
@@ -23,17 +31,27 @@ export const documentIdSchema = z
 
 export const documentListQuerySchema = z
   .object({
-    q: z
-      .string()
-      .trim()
-      .max(100)
-      .transform((value) => value || undefined)
-      .optional(),
+    q: optionalSearchText(100),
+    owner: optionalSearchText(100),
+    ownerId: documentIdSchema.optional(),
+    category: optionalSearchText(80),
+    categoryId: documentIdSchema.optional(),
+    createdFrom: z.iso.datetime({ offset: true }).optional(),
+    createdTo: z.iso.datetime({ offset: true }).optional(),
     state: z.enum(["ACTIVE", "DELETED"]).default("ACTIVE"),
+    sort: z.enum(["createdAt", "updatedAt", "name"]).default("createdAt"),
+    order: z.enum(["asc", "desc"]).default("desc"),
     page: z.coerce.number().int().min(1).max(10_000).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(20),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      !value.createdFrom ||
+      !value.createdTo ||
+      new Date(value.createdFrom) <= new Date(value.createdTo),
+    { message: "createdFrom must not be after createdTo." },
+  );
 
 export const createDocumentSchema = z
   .object({
