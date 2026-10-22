@@ -216,6 +216,39 @@ audit mutations are rejected.
 
 **Commit evidence:** [a7cad29](../../commit/a7cad29), [354b4bd](../../commit/354b4bd)
 
+## 2026-10-22 — 08 — Phase 3 authentication boundary
+
+**What was asked**
+
+Implement all authentication work on a dedicated `authentication` branch,
+explain the phase for interview preparation, validate it, and show every file and
+proposed commit before committing or pushing.
+
+**What the AI produced**
+
+It added Better Auth credentials and PostgreSQL sessions, login and registration
+screens, protected member/admin routes, disabled-account checks, throttling,
+demo-user seeding, unit/integration tests, and responsive browser-verified UI.
+
+**What was weak or wrong**
+
+The first disabled-account hook queried outside Better Auth's signup transaction
+and could not see the uncommitted new user, so it rejected valid registration.
+The first browser preview also showed that a not-yet-hydrated form could fall
+back to GET and expose test credentials in the URL. Finally, Better Auth disables
+origin checks automatically in test mode unless configured otherwise.
+
+**What we chose instead**
+
+Rely on the session foreign key for nonexistent users and reject only an existing
+user with `disabledAt`. Make both credential forms POST even before hydration.
+Explicitly enable origin validation in every environment, and prove mass-
+assignment rejection, password hashing, secure cookies, PostgreSQL sessions,
+untrusted-origin refusal, and disabled-account refusal against isolated
+PostgreSQL.
+
+**Commit evidence:** [f2d2afe](../../commit/f2d2afe), [43a0842](../../commit/43a0842), [7eafd92](../../commit/7eafd92)
+
 ## Entry template
 
 Copy this section for future material AI use:

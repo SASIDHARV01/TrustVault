@@ -102,10 +102,11 @@ committed migrations through `migrate deploy`; it must never use `db push`.
 
 ## Seed-data decision
 
-Credential-bearing demo users are intentionally deferred to Phase 3. Passwords
-must be created through Better Auth's supported hashing and account lifecycle,
-not inserted as raw or guessed database values. Phase 3 will add repeatable demo
-accounts and publish their non-production credentials for judging.
+Phase 3 adds `npm run db:seed:demo`. It creates credential-bearing demo users
+through Better Auth's supported hashing and account lifecycle, then applies the
+trusted system role and removes seed-created sessions. Raw passwords are never
+inserted into PostgreSQL. Existing credential hashes are preserved on rerun so a
+seed command cannot silently reset an account password.
 
 ## Phase 2 verification
 

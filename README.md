@@ -6,9 +6,11 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. Production deployment to Render and the Cloudflare domain is intentionally scheduled for the final implementation phase.
 
-Phases 0–2 currently provide the security contract, public web foundation, and
-validated PostgreSQL data model. Authentication, document storage, protected
-application routes, and deployment are not implemented yet.
+Phases 0–3 currently provide the security contract, public web foundation,
+validated PostgreSQL data model, Better Auth credentials and sessions, protected
+member/admin routes, and repeatable demo identities. Document storage,
+per-document application services, audit-chain writing, and deployment are not
+implemented yet.
 
 ## Security invariants
 
@@ -72,20 +74,25 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`THREATS.md`](THREATS.md) records anticipated attacks, controls, tests, and accepted risks.
 - [`PROMPTS.md`](PROMPTS.md) records how AI was used, what it got wrong, and the commits that corrected it.
 - [`docs/DATABASE.md`](docs/DATABASE.md) explains the Prisma/PostgreSQL model, invariants, migration workflow, and verification evidence.
+- [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) explains credential, session, role, disabled-account, seed, and test decisions.
 - API authorization documentation, seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development
 
-Phase 1 requires Node.js 20.9 or newer. The application does not need database or
-storage credentials until their implementation phases.
+Use Node.js 20.9 or newer. Copy `.env.example` to an ignored `.env.local`, replace
+its placeholders, and apply the database migration before using authentication.
 
 ```bash
 npm install
+npm run db:migrate:deploy
+npm run db:seed:demo
 npm run dev
 ```
 
 Open `http://localhost:3000`. The unauthenticated health check is available at
-`GET /api/health` and intentionally returns only service status.
+`GET /api/health` and intentionally returns only service status. `/vault` and
+`/admin` require a current PostgreSQL-backed session; `/admin` additionally
+requires the database `ADMIN` role.
 
 Run the complete local quality gate before committing:
 

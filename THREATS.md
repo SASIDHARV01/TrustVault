@@ -296,8 +296,27 @@ Each identifier is stable and will be referenced by automated tests.
 
 ## Current implementation evidence
 
-Phase 2 establishes database controls but does not claim that application-level
-authorization or audit hashing is finished.
+Phases 2–3 establish database controls and the authentication boundary. They do
+not claim that document-level application authorization or audit hashing is
+finished.
+
+- TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
+  PostgreSQL session on the server. Proxy cookie checks are explicitly
+  optimistic and never the final authorization decision.
+- TV-002: Better Auth generates session tokens and slow password hashes. Session
+  payload cookie caching is disabled; production cookies are secure, HTTP-only,
+  and same-site. Expired/missing sessions and disabled accounts are denied.
+- TV-003 and TV-020: `role` is a server-owned Better Auth field with
+  `input: false`. A live integration test submitted `role: ADMIN` during signup
+  and confirmed that PostgreSQL stored `MEMBER`.
+- TV-018: Better Auth origin checking is explicitly enabled in every environment;
+  the integration test confirms an untrusted origin receives a refusal.
+- TV-021: login and registration have explicit per-minute rate limits. The
+  limiter is process-local, matching the planned single-instance hackathon
+  deployment; shared storage is required before horizontal scaling.
+- TV-022: runtime auth settings use server-only environment variables, the
+  repository contains placeholders only, and the production build remains
+  independent from live credentials without weakening runtime checks.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.
