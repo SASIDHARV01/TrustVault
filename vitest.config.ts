@@ -12,5 +12,8 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+    // PostgreSQL integration files share the one production-shaped audit chain.
+    // Serial files prevent unrelated suites from changing its head mid-assertion.
+    fileParallelism: false,
   },
 });
