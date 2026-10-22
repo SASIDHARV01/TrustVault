@@ -1,0 +1,259 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SystemRole {
+  MEMBER
+  ADMIN
+}
+
+enum AccessLevel {
+  READ
+  EDIT
+}
+
+enum DocumentState {
+  ACTIVE
+  DELETED
+}
+
+enum StorageState {
+  PENDING
+  READY
+  FAILED
+  DELETED
+}
+
+enum AuditAction {
+  AUTH_SIGN_IN
+  AUTH_SIGN_OUT
+  DOCUMENT_UPLOAD
+  DOCUMENT_READ
+  DOCUMENT_DOWNLOAD
+  DOCUMENT_UPDATE
+  DOCUMENT_DELETE
+  DOCUMENT_RESTORE
+  DOCUMENT_VERSION_CREATE
+  PERMISSION_GRANT
+  PERMISSION_UPDATE
+  PERMISSION_REVOKE
+  ADMIN_OVERRIDE_READ
+  AUDIT_VERIFY
+}
+
+enum AuditOutcome {
+  ALLOWED
+  DENIED
+  FAILED
+}
+
+enum AuditResource {
+  AUTH
+  DOCUMENT
+  PERMISSION
+  AUDIT
+  SYSTEM
+}
+
+// Better Auth core model plus TrustVault's system-level role. Document owner,
+// reader, and editor are resource relationships rather than global user roles.
+model User {
+  id            String     @id @default(cuid())
+  name          String     @db.VarChar(120)
+  email         String     @unique @db.VarChar(320)
+  emailVerified Boolean    @default(false)
+  image         String?
+  role          SystemRole @default(MEMBER)
+  disabledAt    DateTime?  @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime   @updatedAt @db.Timestamptz(6)
+
+  sessions         Session[]
+  accounts         Account[]
+  categories       Category[]
+  ownedDocuments   Document[]        @relation("DocumentOwner")
+  deletedDocuments Document[]        @relation("DocumentDeletedBy")
+  createdVersions  DocumentVersion[] @relation("VersionCreator")
+  receivedGrants   DocumentGrant[]   @relation("GrantRecipient")
+  issuedGrants     DocumentGrant[]   @relation("GrantIssuer")
+  revokedGrants    DocumentGrant[]   @relation("GrantRevoker")
+  auditEvents      AuditEvent[]      @relation("AuditActor")
+
+  @@index([role, disabledAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime @db.Timestamptz(6)
+  token     String   @unique @db.VarChar(255)
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(512)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String    @db.VarChar(255)
+  providerId            String    @db.VarChar(80)
+  userId                String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(6)
+  scope                 String?   @db.Text
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String   @db.VarChar(320)
+  value      String   @db.Text
+  expiresAt  DateTime @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([identifier, expiresAt])
+}
+
+model Category {
+  id             String     @id @default(cuid())
+  ownerId        String
+  name           String     @db.VarChar(80)
+  normalizedName String     @db.VarChar(80)
+  createdAt      DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @db.Timestamptz(6)
+  owner          User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents      Document[]
+
+  @@unique([ownerId, normalizedName])
+}
+
+model Document {
+  id          String        @id @default(cuid())
+  ownerId     String
+  categoryId  String?
+  name        String        @db.VarChar(255)
+  description String?       @db.VarChar(1000)
+  state       DocumentState @default(ACTIVE)
+  deletedAt   DateTime?     @db.Timestamptz(6)
+  deletedById String?
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
+
+  owner       User              @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  category    Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  deletedBy   User?             @relation("DocumentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  versions    DocumentVersion[]
+  grants      DocumentGrant[]
+  auditEvents AuditEvent[]
+
+  @@index([ownerId, state, createdAt(sort: Desc)])
+  @@index([categoryId, state])
+  @@index([name])
+}
+
+// Versions are immutable after their storage state becomes READY. The object key
+// always points to a private Cloudflare R2 object and is never sent as a public URL.
+model DocumentVersion {
+  id               String       @id @default(cuid())
+  documentId       String
+  versionNumber    Int
+  originalFilename String       @db.VarChar(255)
+  mimeType         String       @db.VarChar(128)
+  sizeBytes        BigInt
+  sha256           String       @db.Char(64)
+  storageKey       String       @unique @db.VarChar(512)
+  storageState     StorageState @default(PENDING)
+  createdById      String
+  createdAt        DateTime     @default(now()) @db.Timestamptz(6)
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("VersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, storageState, createdAt(sort: Desc)])
+}
+
+// Migration SQL adds a partial unique index so each recipient has at most one
+// active grant per document while preserving revoked grants as security history.
+model DocumentGrant {
+  id          String      @id @default(cuid())
+  documentId  String
+  recipientId String
+  accessLevel AccessLevel
+  grantedById String
+  createdAt   DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(6)
+  revokedAt   DateTime?   @db.Timestamptz(6)
+  revokedById String?
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  recipient User     @relation("GrantRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  grantedBy User     @relation("GrantIssuer", fields: [grantedById], references: [id], onDelete: Restrict)
+  revokedBy User?    @relation("GrantRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([recipientId, revokedAt, accessLevel])
+  @@index([documentId, revokedAt])
+}
+
+// AuditEvent has no application update/delete path. Migration-level triggers
+// also reject mutation, while chained keyed hashes make missing/reordered rows
+// detectable. Actor and document are nullable so denied anonymous or unknown-ID
+// requests can still be recorded without inventing relational data.
+model AuditEvent {
+  id             BigInt        @id @default(autoincrement())
+  eventId        String        @unique @default(cuid())
+  actorId        String?
+  documentId     String?
+  action         AuditAction
+  outcome        AuditOutcome
+  resource       AuditResource
+  targetId       String?       @db.VarChar(255)
+  reason         String?       @db.VarChar(1000)
+  requestId      String?       @db.VarChar(128)
+  ipAddress      String?       @db.VarChar(45)
+  userAgent      String?       @db.VarChar(512)
+  metadata       Json          @default("{}")
+  previousHash   String        @db.Char(64)
+  eventHash      String        @unique @db.Char(64)
+  hmacKeyVersion Int           @default(1)
+  occurredAt     DateTime      @default(now()) @db.Timestamptz(6)
+
+  actor      User?            @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  document   Document?        @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  checkpoint AuditCheckpoint?
+
+  @@index([actorId, occurredAt(sort: Desc)])
+  @@index([documentId, occurredAt(sort: Desc)])
+  @@index([action, outcome, occurredAt(sort: Desc)])
+  @@index([requestId])
+}
+
+// Checkpoint bytes will be written to a separately locked R2 location. This row
+// links that external evidence to the exact database chain head it protects.
+model AuditCheckpoint {
+  id             String     @id @default(cuid())
+  throughEventId BigInt     @unique
+  chainHash      String     @db.Char(64)
+  storageKey     String     @unique @db.VarChar(512)
+  createdAt      DateTime   @default(now()) @db.Timestamptz(6)
+  throughEvent   AuditEvent @relation(fields: [throughEventId], references: [id], onDelete: Restrict)
+}

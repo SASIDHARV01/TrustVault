@@ -9,6 +9,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Generated Prisma client (recreated by npm run db:generate)
+src/generated/prisma/
+
 # Local tooling caches
 .turbo/
 .cache/
