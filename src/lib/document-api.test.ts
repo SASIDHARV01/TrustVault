@@ -11,19 +11,38 @@ describe("document API validation", () => {
   it("normalizes safe list defaults and bounded pagination", () => {
     expect(documentListQuerySchema.parse({})).toEqual({
       state: "ACTIVE",
+      sort: "createdAt",
+      order: "desc",
       page: 1,
       limit: 20,
     });
     expect(
       documentListQuerySchema.parse({ q: "  salary  ", page: "2", limit: "50" }),
-    ).toEqual({ state: "ACTIVE", q: "salary", page: 2, limit: 50 });
+    ).toEqual({
+      state: "ACTIVE",
+      q: "salary",
+      sort: "createdAt",
+      order: "desc",
+      page: 2,
+      limit: 50,
+    });
     expect(documentListQuerySchema.safeParse({ limit: "51" }).success).toBe(false);
   });
 
-  it("rejects unknown query parameters", () => {
-    expect(documentListQuerySchema.safeParse({ ownerId: "someone-else" }).success).toBe(
-      false,
-    );
+  it("accepts allowlisted search filters and rejects invalid ranges or fields", () => {
+    expect(documentListQuerySchema.safeParse({
+      ownerId: "someone-else",
+      category: "Finance",
+      createdFrom: "2026-01-01T00:00:00.000Z",
+      createdTo: "2026-12-31T23:59:59.999Z",
+      sort: "name",
+      order: "asc",
+    }).success).toBe(true);
+    expect(documentListQuerySchema.safeParse({
+      createdFrom: "2027-01-01T00:00:00.000Z",
+      createdTo: "2026-01-01T00:00:00.000Z",
+    }).success).toBe(false);
+    expect(documentListQuerySchema.safeParse({ role: "ADMIN" }).success).toBe(false);
   });
 
   it("accepts opaque application IDs but rejects path-like values", () => {

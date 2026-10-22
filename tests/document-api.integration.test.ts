@@ -180,6 +180,35 @@ describeWithDatabase("document metadata API PostgreSQL integration", () => {
     );
   });
 
+  it("combines name, owner, category, date, and sorting with the access predicate", async () => {
+    currentActor = { id: users.reader, role: "MEMBER" };
+    const readerFiltered = await handlers.list(request(
+      `/api/documents?q=salary&owner=${encodeURIComponent("API owner")}&categoryId=${ownerCategoryId}&createdFrom=${encodeURIComponent("2020-01-01T00:00:00.000Z")}&createdTo=${encodeURIComponent("2030-01-01T00:00:00.000Z")}&sort=name&order=asc`,
+    ));
+    expect((await body(readerFiltered)).data?.documents?.map(({ id }) => id)).toEqual([
+      targetDocumentId,
+    ]);
+
+    const foreignCategory = await handlers.list(request(
+      `/api/documents?categoryId=${unrelatedCategoryId}`,
+    ));
+    expect((await body(foreignCategory)).data?.documents).toEqual([]);
+
+    currentActor = { id: users.unrelated, role: "MEMBER" };
+    const ownerProbe = await handlers.list(request(
+      `/api/documents?ownerId=${users.owner}&category=${encodeURIComponent("Owner category")}`,
+    ));
+    expect((await body(ownerProbe)).data?.documents).toEqual([]);
+
+    currentActor = { id: users.admin, role: "ADMIN" };
+    const adminOwnerFilter = await handlers.list(request(
+      `/api/documents?ownerId=${users.owner}`,
+    ));
+    expect((await body(adminOwnerFilter)).data?.documents?.map(({ id }) => id)).toEqual([
+      targetDocumentId,
+    ]);
+  });
+
   it("returns the same response for missing and inaccessible documents", async () => {
     currentActor = { id: users.unrelated, role: "MEMBER" };
     const inaccessible = await handlers.get(
@@ -238,6 +267,12 @@ describeWithDatabase("document metadata API PostgreSQL integration", () => {
     );
     expect(ownerDelete.status).toBe(200);
     expect((await body(ownerDelete)).data?.document?.state).toBe("DELETED");
+
+    currentActor = { id: users.unrelated, role: "MEMBER" };
+    const deletedOwnerProbe = await handlers.list(request(
+      `/api/documents?state=DELETED&ownerId=${users.owner}`,
+    ));
+    expect((await body(deletedOwnerProbe)).data?.documents).toEqual([]);
 
     currentActor = { id: users.reader, role: "MEMBER" };
     const deletedRead = await handlers.get(
