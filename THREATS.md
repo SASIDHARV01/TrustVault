@@ -294,6 +294,26 @@ Each identifier is stable and will be referenced by automated tests.
   legitimate read. TrustVault prevents future server reads after revocation; it
   cannot revoke copies already obtained by an authorized person.
 
+## Current implementation evidence
+
+Phase 2 establishes database controls but does not claim that application-level
+authorization or audit hashing is finished.
+
+- TV-005: a partial unique PostgreSQL index permits at most one active grant per
+  document and recipient while retaining revoked grants as history.
+- TV-012: document versions record explicit `PENDING`, `READY`, `FAILED`, and
+  `DELETED` storage states for later compensating workflows.
+- TV-015: PostgreSQL triggers reject `UPDATE` and `DELETE` against audit events
+  and checkpoints. Hash columns and constraints exist; the chained-HMAC writer
+  and locked R2 checkpoint job remain future work.
+- TV-020: foreign keys, uniqueness rules, positive size/version checks, deletion
+  consistency, revocation consistency, and hash-format checks reject malformed
+  relational states independently of the browser.
+- The initial migration was applied to an isolated PostgreSQL 15 instance. Live
+  adversarial checks confirmed rejection of duplicate active grants,
+  inconsistent soft deletion, invalid hashes, audit updates, and checkpoint
+  deletion.
+
 ## Review rule
 
 Update this file whenever an endpoint, role, storage path, audit event, or AI

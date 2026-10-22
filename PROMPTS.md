@@ -183,6 +183,39 @@ and the online dependency audit all passed before commit.
 
 **Commit evidence:** [cac2115](../../commit/cac2115)
 
+## 2026-10-22 — 07 — Phase 2 security data model
+
+**What was asked**
+
+Implement Phase 2 after first explaining the existing system, planned database
+architecture, workflow, commits, validation, and interview reasoning.
+
+**What the AI produced**
+
+It added pinned Prisma 7 PostgreSQL tooling, Better Auth-compatible identity
+models, document/category/version/grant models, audit events and checkpoints, a
+server-only pooled runtime client, the first SQL migration, schema-contract tests,
+and database architecture documentation.
+
+**What was weak or wrong**
+
+Using `prisma@latest` would have selected a Prisma 8 release candidate while the
+stable client remained on Prisma 7. Prisma's schema language also cannot express
+the partial unique index and append-only triggers required by TrustVault. The
+earlier Phase 2 outline proposed seed users before authentication existed, which
+would have encouraged direct password/account insertion outside Better Auth.
+
+**What we chose instead**
+
+Pin Prisma CLI, client, and PostgreSQL adapter to stable 7.10.1. Add the active-
+grant constraint, consistency checks, hash checks, and audit immutability triggers
+in reviewed migration SQL. Defer credential-bearing seeds until Better Auth can
+create them correctly. Apply the migration to isolated PostgreSQL 15 and run live
+adversarial statements proving that invalid grants, deletion state, hashes, and
+audit mutations are rejected.
+
+**Commit evidence:** [a7cad29](../../commit/a7cad29), [354b4bd](../../commit/354b4bd)
+
 ## Entry template
 
 Copy this section for future material AI use:
