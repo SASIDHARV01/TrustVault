@@ -379,7 +379,7 @@ cannot commit when its audit signature cannot be created. Document honestly that
 an independent R2 chain-head checkpoint is still required to detect privileged
 tail truncation.
 
-**Commit evidence:** pending Phase 5 commits
+**Commit evidence:** [ec8dd39](../../commit/ec8dd39), [c24b0fc](../../commit/c24b0fc), [0b09191](../../commit/0b09191), [a48e002](../../commit/a48e002), [43981c6](../../commit/43981c6)
 
 ## 2026-10-22 — 13 — Phase 6.1 private R2 storage boundary
 
@@ -411,7 +411,7 @@ a deterministic in-memory implementation for later adversarial tests, expose no
 list or presigned-URL operation, and document that live bucket privacy and token
 scope remain deployment checks rather than locally proven facts.
 
-**Commit evidence:** pending Phase 6.1 commits
+**Commit evidence:** [9d255e2](../../commit/9d255e2), [e22885d](../../commit/e22885d), [293a2a4](../../commit/293a2a4)
 
 ## 2026-10-22 — 14 — Complete Phase 6 secure document lifecycle
 
@@ -446,7 +446,7 @@ and recompute SHA-256 over the actual bytes before returning them. Require a
 Cloudflare bucket-lock rule on `audit-checkpoints/` before claiming independent
 production immutability.
 
-**Commit evidence:** pending Phase 6 commits
+**Commit evidence:** [943f243](../../commit/943f243), [3b47ed0](../../commit/3b47ed0), [1425eb1](../../commit/1425eb1), [b9d7861](../../commit/b9d7861), [822bdda](../../commit/822bdda)
 
 ## 2026-10-22 — 15 — Phase 7 categories and secure search
 
@@ -478,7 +478,44 @@ ownership only from the current session, give administrators no implicit
 cross-owner mutation power, and audit category decisions by opaque ID without
 storing names.
 
-**Commit evidence:** pending Phase 7 commits
+**Commit evidence:** [c1e6184](../../commit/c1e6184), [0cfcfe5](../../commit/0cfcfe5), [566dd8c](../../commit/566dd8c), [ecf7971](../../commit/ecf7971)
+
+## 2026-10-23 — 16 — Phase 8 member and administrator workspaces
+
+**What was asked**
+
+Merge the complete organization/search branch, then build the complete vault
+and administrator interface while preserving the security architecture.
+
+**What the AI produced**
+
+It added a typed same-origin browser API layer, responsive vault discovery,
+all required name/owner/category/date filters, category management, staged
+create-and-upload behavior, document details, immutable versions, preview and
+download, owner sharing and activity, administrator metadata oversight, system
+activity filters, chain verification, R2 checkpoints, and reason-bearing
+administrator content access.
+
+**What was weak or wrong**
+
+The first visual pass exposed only name and category selection even though the
+challenge and existing API require owner and creation-date search. The first
+async form handlers also read React's `currentTarget` after awaited requests,
+which is unnecessarily fragile. A pre-existing README sentence claimed user
+lifecycle management even though neither the challenge floor nor the backend
+defines that capability.
+
+**What we chose instead**
+
+Expose all four required search dimensions while keeping them composed with the
+server authorization predicate. Capture form elements before awaiting network
+operations, preserve partially created metadata when object upload fails, and
+describe the administrator boundary honestly: metadata, activity, verification,
+and explicitly audited content override, but no owner or user-lifecycle powers.
+Validate member/admin journeys with an isolated PostgreSQL database and desktop
+and mobile browser passes, without claiming fake R2 credentials prove storage.
+
+**Commit evidence:** pending Phase 8 commits
 
 ## Entry template
 

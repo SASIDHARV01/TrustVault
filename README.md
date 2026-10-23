@@ -17,7 +17,8 @@ versions, authorized preview/download, immediate content revocation, audited
 administrator override, failure compensation, actual-byte SHA-256 verification,
 and locked-prefix audit checkpoints. Phase 7 adds audited owner-scoped category
 management and database-authorized search by name, owner, category, date, state,
-and safe sort/pagination fields. Product screens, live R2 verification,
+and safe sort/pagination fields. Phase 8 adds responsive member and administrator
+workspaces for those capabilities. Live R2 verification, browser security
 hardening, and deployment remain upcoming phases.
 
 ## Security invariants
@@ -38,7 +39,7 @@ These rules are part of the product contract, not optional implementation detail
 
 ### Administrator
 
-An administrator can manage users, review system-wide document metadata, inspect audit activity, verify audit integrity, and use an explicit privileged document-viewing flow. Privileged viewing requires a reason and creates a high-visibility `ADMIN_OVERRIDE_READ` event. It does not grant edit, delete, ownership, or permission-management rights.
+An administrator can review system-wide document metadata, inspect audit activity, verify audit integrity, and use an explicit privileged document-viewing flow. Privileged viewing requires a reason and creates a high-visibility `ADMIN_OVERRIDE_READ` event. It does not grant edit, delete, ownership, permission-management, or user-lifecycle rights.
 
 ### Document owner
 
@@ -89,6 +90,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/AUDIT.md`](docs/AUDIT.md) explains event coverage, HMAC chaining, transactional writes, activity authorization, verification, and the external-checkpoint boundary.
 - [`docs/STORAGE.md`](docs/STORAGE.md) defines the private R2 boundary, key strategy, least-privilege configuration, and current verification limits.
 - [`docs/ORGANIZATION_SEARCH.md`](docs/ORGANIZATION_SEARCH.md) documents owner-scoped categories, authorization-composed search filters, and enumeration controls.
+- [`docs/INTERFACE.md`](docs/INTERFACE.md) explains the member vault, administrator control room, browser request model, and UI verification boundary.
 - Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development
