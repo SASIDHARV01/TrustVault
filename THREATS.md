@@ -233,9 +233,10 @@ Each identifier is stable and will be referenced by automated tests.
 - Attack: inject script through filenames, categories, descriptions, audit
   reasons, or document preview content.
 - Control: React escaping, schema validation, plain-text rendering for user
-  metadata, safe content disposition, and no inline rendering of active file
-  types in v1.
-- Test: stored script payloads render as text and downloads use safe headers.
+  metadata, nonce-based Content Security Policy on dynamic application pages,
+  safe content disposition, and no inline rendering of active file types in v1.
+- Test: a stored event-handler payload renders as text under a policy without
+  `unsafe-inline`, and downloads use safe headers.
 
 #### TV-020: Injection and mass assignment
 
@@ -302,7 +303,9 @@ READ/EDIT sharing. Phase 5 adds transaction-coupled audit writing, activity
 access, and chain verification. Phase 6 adds validated private content,
 immutable versions, per-request delivery authorization, failure compensation,
 administrator override evidence, and external chain-head checkpoints. Phase 7
-adds owner-scoped categories and authorization-composed document search.
+adds owner-scoped categories and authorization-composed document search. Phase
+9 adds shared request limits, nonce-based browser policy, provider deadlines,
+adversarial Chromium journeys, and a CI security gate.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current
   PostgreSQL session on the server. Proxy cookie checks are explicitly
@@ -315,9 +318,18 @@ adds owner-scoped categories and authorization-composed document search.
   and confirmed that PostgreSQL stored `MEMBER`.
 - TV-018: Better Auth origin checking is explicitly enabled in every environment;
   the integration test confirms an untrusted origin receives a refusal.
-- TV-021: login and registration have explicit per-minute rate limits. The
-  limiter is process-local, matching the planned single-instance hackathon
-  deployment; shared storage is required before horizontal scaling.
+- TV-021: login and registration retain dedicated throttling. High-cost
+  document, recipient, activity, verification, and checkpoint routes use atomic
+  PostgreSQL fixed-window counters shared across application processes. The
+  database test proves concurrent requests cannot exceed the allowance, the
+  browser journey proves a controlled `429`, and all R2 calls have a 15-second
+  abort deadline.
+- TV-019: protected dynamic pages receive a per-request nonce policy without
+  `unsafe-inline`; the browser journey proves a hostile stored filename remains
+  text and does not create or execute an injected element.
+- TV-023: GitHub Actions installs from the committed lockfile, rejects
+  high-severity audit findings, applies migrations, runs unit/integration/build
+  gates, and executes the adversarial Chromium journey against PostgreSQL 15.
 - TV-022: runtime auth settings use server-only environment variables, the
   repository contains placeholders only, and the production build remains
   independent from live credentials without weakening runtime checks.
@@ -417,7 +429,7 @@ adds owner-scoped categories and authorization-composed document search.
 - TV-020: foreign keys, uniqueness rules, positive size/version checks, deletion
   consistency, revocation consistency, and hash-format checks reject malformed
   relational states independently of the browser.
-- All three migrations were applied to an isolated PostgreSQL 15 instance. Live
+- All five migrations were applied to an isolated PostgreSQL 15 instance. Live
   adversarial checks confirmed grant/content role boundaries, immediate
   revocation, collision-free concurrent version numbering, failure states,
   integrity refusal, and rejection of audit/checkpoint mutations.

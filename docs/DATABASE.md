@@ -1,6 +1,6 @@
 # TrustVault Database Architecture
 
-Last verified: 2026-10-22
+Last verified: 2026-10-23
 
 ## Purpose
 
@@ -77,6 +77,15 @@ Independent R2 chain-head checkpoint writing is implemented in Phase 6. An
 internally valid database chain alone cannot prove that a privileged database
 operator did not truncate its newest events.
 
+### Operational request limits
+
+`RequestRateLimit` stores fixed-window counters shared by every application
+process. Its primary key is a SHA-256 fingerprint of the policy and bounded
+client address; raw network addresses are not retained. One PostgreSQL upsert
+atomically increments or resets each counter, so concurrent requests cannot all
+slip past the configured maximum. The table contains operational state rather
+than audit evidence and may be expired by a future maintenance job.
+
 ## Database-enforced invariants
 
 The initial SQL migration adds constraints that Prisma cannot express directly:
@@ -116,7 +125,7 @@ trusted system role and removes seed-created sessions. Raw passwords are never
 inserted into PostgreSQL. Existing credential hashes are preserved on rerun so a
 seed command cannot silently reset an account password.
 
-## Phase 2 verification
+## Verification history
 
 The following checks passed before the phase commit:
 
@@ -131,3 +140,7 @@ The following checks passed before the phase commit:
 Supabase connectivity is not claimed yet because no project credential has been
 provided. Applying the committed migration to Supabase belongs to the environment
 connection step, not local schema design.
+
+Phase 9 adds the request-limit migration and an isolated PostgreSQL concurrency
+test. The test sends eleven simultaneous attempts against a ten-request policy,
+proves exactly ten are admitted, then proves the next time window resets safely.

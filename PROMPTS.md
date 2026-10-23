@@ -517,6 +517,37 @@ and mobile browser passes, without claiming fake R2 credentials prove storage.
 
 **Commit evidence:** pending Phase 8 commits
 
+## 2026-10-23 — 17 — Phase 9 adversarial security hardening
+
+**What was asked**
+
+Implement the complete security-hardening phase at once while preserving the
+existing authorization, audit, storage, and interface boundaries.
+
+**What the AI produced**
+
+It added database-shared rate limits for expensive application routes, nonce
+Content Security Policy for dynamic account/workspace pages, stricter response
+headers, R2 provider deadlines, a PostgreSQL concurrency test, one multi-role
+Playwright attack journey, and a PostgreSQL-backed GitHub Actions quality gate.
+
+**What was weak or wrong**
+
+The first generated package edit duplicated the Playwright dependency, and the
+first CI environment set `NODE_ENV=test` even though the workflow builds and
+starts a production Next.js server. The initial browser assertions also used a
+Jest-style promise matcher unnecessarily.
+
+**What we chose instead**
+
+Keep one lockfile-backed Playwright dependency, let Next use its correct
+production environment in CI, await response JSON explicitly, hash rather than
+store raw client addresses, and prove the shared counter atomically under
+concurrency. Keep placeholder CI storage credentials honest: the browser path
+does not claim live R2 verification, which remains a deployment task.
+
+**Commit evidence:** pending Phase 9 commits
+
 ## Entry template
 
 Copy this section for future material AI use:
