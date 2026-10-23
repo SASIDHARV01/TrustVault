@@ -21,6 +21,12 @@ import {
 } from "@/lib/object-storage";
 import { getR2Config, type R2Config } from "@/lib/server/storage-config";
 
+export const R2_REQUEST_TIMEOUT_MS = 15_000;
+
+function providerRequestOptions() {
+  return { abortSignal: AbortSignal.timeout(R2_REQUEST_TIMEOUT_MS) };
+}
+
 function cleanEtag(etag: string | undefined) {
   return etag?.replace(/^"|"$/g, "") ?? null;
 }
@@ -80,6 +86,7 @@ export class R2ObjectStorage implements ObjectStorage {
           CacheControl: "private, no-store",
           Metadata: { sha256: input.sha256 },
         }),
+        providerRequestOptions(),
       );
       return {
         contentType: input.contentType,
@@ -97,6 +104,7 @@ export class R2ObjectStorage implements ObjectStorage {
     try {
       const output = await this.client.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: trustedKey }),
+        providerRequestOptions(),
       );
       if (!output.Body) {
         throw new ObjectStorageError("PROVIDER_ERROR");
@@ -115,6 +123,7 @@ export class R2ObjectStorage implements ObjectStorage {
     try {
       const output = await this.client.send(
         new HeadObjectCommand({ Bucket: this.bucket, Key: trustedKey }),
+        providerRequestOptions(),
       );
       return metadataFrom(output);
     } catch (error) {
@@ -127,6 +136,7 @@ export class R2ObjectStorage implements ObjectStorage {
     try {
       await this.client.send(
         new DeleteObjectCommand({ Bucket: this.bucket, Key: trustedKey }),
+        providerRequestOptions(),
       );
     } catch (error) {
       return translateProviderError(error);

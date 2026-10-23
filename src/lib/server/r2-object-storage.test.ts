@@ -49,6 +49,7 @@ describe("Cloudflare R2 object storage adapter", () => {
       Metadata: { sha256 },
     });
     expect(command.input).not.toHaveProperty("ACL");
+    expect(send.mock.calls[0]?.[1]?.abortSignal).toBeInstanceOf(AbortSignal);
   });
 
   it("returns an object as a web stream without creating a signed URL", async () => {
@@ -69,6 +70,7 @@ describe("Cloudflare R2 object storage adapter", () => {
 
     const result = await storage.get(key);
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(GetObjectCommand);
+    expect(send.mock.calls[0]?.[1]?.abortSignal).toBeInstanceOf(AbortSignal);
     expect(new Uint8Array(await new Response(result.body).arrayBuffer())).toEqual(
       Uint8Array.from([4, 5, 6]),
     );
