@@ -1,0 +1,61 @@
+name: Security quality gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trustvault
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trustvault"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      APP_URL: http://127.0.0.1:3002
+      E2E_BASE_URL: http://127.0.0.1:3002
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
+      BETTER_AUTH_SECRET: ci-only-better-auth-secret-at-least-32-characters
+      AUDIT_HMAC_KEY_VERSION: "1"
+      # Matches the deterministic non-production key used by integration fixtures.
+      AUDIT_HMAC_KEYS: '{"1":"FRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRU="}'
+      DEMO_ADMIN_EMAIL: admin@trustvault.local
+      DEMO_ADMIN_PASSWORD: CiOnlyAdminPassword!2026
+      DEMO_OWNER_EMAIL: owner@trustvault.local
+      DEMO_OWNER_PASSWORD: CiOnlyOwnerPassword!2026
+      DEMO_VIEWER_EMAIL: viewer@trustvault.local
+      DEMO_VIEWER_PASSWORD: CiOnlyViewerPassword!2026
+      R2_ACCOUNT_ID: "11111111111111111111111111111111"
+      R2_ACCESS_KEY_ID: "22222222222222222222222222222222"
+      R2_SECRET_ACCESS_KEY: "3333333333333333333333333333333333333333333333333333333333333333"
+      R2_BUCKET_NAME: trustvault-ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run db:migrate:deploy
+      - run: npm run db:seed:demo
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

@@ -266,3 +266,15 @@ model AuditCheckpoint {
   createdAt      DateTime   @default(now()) @db.Timestamptz(6)
   throughEvent   AuditEvent @relation(fields: [throughEventId], references: [id], onDelete: Restrict)
 }
+
+// Shared fixed-window counters protect expensive HTTP operations across server
+// processes. Keys are HMAC-free SHA-256 fingerprints of policy + client address;
+// raw client addresses are never retained in this operational table.
+model RequestRateLimit {
+  key             String   @id @db.VarChar(64)
+  count           Int
+  windowStartedAt DateTime @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([updatedAt])
+}

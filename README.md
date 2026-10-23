@@ -18,8 +18,10 @@ administrator override, failure compensation, actual-byte SHA-256 verification,
 and locked-prefix audit checkpoints. Phase 7 adds audited owner-scoped category
 management and database-authorized search by name, owner, category, date, state,
 and safe sort/pagination fields. Phase 8 adds responsive member and administrator
-workspaces for those capabilities. Live R2 verification, browser security
-hardening, and deployment remain upcoming phases.
+workspaces for those capabilities. Phase 9 adds shared PostgreSQL-backed request
+limits, nonce-based browser policy, provider timeouts, adversarial browser
+journeys, and an automated security quality gate. Live R2 verification and
+deployment remain upcoming phases.
 
 ## Security invariants
 
@@ -91,6 +93,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/STORAGE.md`](docs/STORAGE.md) defines the private R2 boundary, key strategy, least-privilege configuration, and current verification limits.
 - [`docs/ORGANIZATION_SEARCH.md`](docs/ORGANIZATION_SEARCH.md) documents owner-scoped categories, authorization-composed search filters, and enumeration controls.
 - [`docs/INTERFACE.md`](docs/INTERFACE.md) explains the member vault, administrator control room, browser request model, and UI verification boundary.
+- [`docs/SECURITY_HARDENING.md`](docs/SECURITY_HARDENING.md) explains request limits, browser defenses, adversarial journeys, CI enforcement, and remaining deployment checks.
 - Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development
@@ -120,6 +123,11 @@ This executes linting, strict TypeScript validation, unit tests, and the
 production build. It now validates the Prisma schema and regenerates the typed
 database client as part of the build. Use `npm audit` separately because it
 requires registry access.
+
+After applying migrations and seeding the demo identities, run the adversarial
+Chromium journey with `npm run test:e2e`. `npm run test:security` combines the
+application quality gate and that browser suite. CI also installs from the
+lockfile and rejects high-severity dependency audit findings.
 
 ## Development rule
 

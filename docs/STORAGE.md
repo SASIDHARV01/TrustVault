@@ -133,3 +133,9 @@ content-integrity rejection, external checkpoint creation, and database
 immutability. The production build and dependency audit are separate final
 quality gates. A live R2 privacy/token/lock check remains required during
 deployment because no cloud credentials are committed or used in tests.
+
+Every R2 put, get, head, and delete operation has a 15-second abort deadline so
+a stalled provider cannot hold an application request indefinitely. The upload
+limit remains 10 MiB, and document-content routes also use the shared Phase 9
+request limiter. The live deployment check must still confirm realistic R2
+latency, bucket privacy, token scope, and checkpoint retention.

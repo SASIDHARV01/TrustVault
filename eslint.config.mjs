@@ -7,6 +7,8 @@ export default tseslint.config([
     ".next/**",
     "coverage/**",
     "dist/**",
+    "playwright-report/**",
+    "test-results/**",
     "next-env.d.ts",
   ]),
   js.configs.recommended,
