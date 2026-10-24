@@ -6,6 +6,13 @@ import { FormEvent, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { firstValidationError, loginSchema } from "@/lib/auth-validation";
+import { CyberActionButton } from "@/components/cyber/cyber-action-button";
+
+const loginStages = [
+  "Checking credentials",
+  "Verifying secure session",
+  "Opening the vault",
+] as const;
 
 export function LoginForm({ callbackPath }: { callbackPath: string }) {
   const router = useRouter();
@@ -71,9 +78,13 @@ export function LoginForm({ callbackPath }: { callbackPath: string }) {
         Keep me signed in on this device
       </label>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="button button--primary auth-submit" disabled={pending} type="submit">
-        {pending ? "Verifying…" : "Enter the vault"}
-      </button>
+      <CyberActionButton
+        className="auth-submit"
+        idleLabel="Enter the secure multiverse"
+        pending={pending}
+        stages={loginStages}
+        type="submit"
+      />
       <p className="auth-form__switch">
         New to TrustVault? <Link href={`/register?next=${encodeURIComponent(callbackPath)}`}>Create an account</Link>
       </p>

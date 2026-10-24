@@ -22,9 +22,9 @@ export default async function LoginPage({
 
   return (
     <AuthShell
-      eyebrow="Welcome back"
-      title="Sign in to TrustVault"
-      description="Use the account connected to your confidential workspace."
+      eyebrow="Secure gateway // returning identity"
+      title="Authenticate to enter"
+      description="Connect the identity assigned to your confidential document workspace."
     >
       <LoginForm callbackPath={callbackPath} />
     </AuthShell>

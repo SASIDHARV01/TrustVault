@@ -16,22 +16,26 @@ export function AuthShell({
   return (
     <main className="auth-page">
       <section className="auth-story">
+        <div className="auth-story__matrix" aria-hidden="true" />
         <Link className="brand-link" href="/" aria-label="TrustVault home">
           <BrandMark />
         </Link>
         <div className="auth-story__copy">
-          <p className="eyebrow"><span /> Protected workspace</p>
-          <h1>Your documents stay private until the server says otherwise.</h1>
+          <p className="eyebrow"><span /> Identity gateway // clearance required</p>
+          <h1>Enter a workspace where every request must prove itself.</h1>
           <p>
-            Every protected request revalidates the database session. A page,
-            cookie, or guessed URL is never treated as permission.
+            TrustVault revalidates identity, permission, and document state on
+            every protected request. Possessing a link is never clearance.
           </p>
         </div>
         <ul className="auth-promises">
-          <li><span>01</span> Passwords are stored as slow hashes, never plain text.</li>
-          <li><span>02</span> Sessions live in PostgreSQL and can be invalidated.</li>
-          <li><span>03</span> Administrator access comes only from trusted data.</li>
+          <li><span>01</span><strong>IDENTITY</strong> Slow password hashes. No plain-text secrets.</li>
+          <li><span>02</span><strong>SESSION</strong> Database-backed sessions that can be terminated.</li>
+          <li><span>03</span><strong>AUTHORITY</strong> Trusted server data controls administrator access.</li>
         </ul>
+        <div className="auth-story__telemetry" aria-hidden="true">
+          <span>NODE: TV-AUTH-01</span><span>CHANNEL: ENCRYPTED</span><span>STATUS: ONLINE</span>
+        </div>
       </section>
 
       <section className="auth-panel">

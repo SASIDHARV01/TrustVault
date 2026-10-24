@@ -22,9 +22,9 @@ export default async function RegisterPage({
 
   return (
     <AuthShell
-      eyebrow="Start securely"
-      title="Create your account"
-      description="New accounts receive ordinary member access. Administrator status cannot be requested here."
+      eyebrow="New identity // member clearance"
+      title="Create your secure identity"
+      description="New identities receive member clearance. Administrator authority can only originate from trusted server data."
     >
       <RegisterForm callbackPath={callbackPath} />
     </AuthShell>
