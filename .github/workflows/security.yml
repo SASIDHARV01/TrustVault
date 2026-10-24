@@ -46,14 +46,20 @@ jobs:
       - name: Generate ephemeral CI credentials
         shell: bash
         run: |
-          echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "AUDIT_HMAC_KEYS={\"1\":\"$(openssl rand -base64 32 | tr -d '\n')\"}" >> "$GITHUB_ENV"
-          echo "DEMO_ADMIN_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "DEMO_OWNER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "DEMO_VIEWER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "R2_ACCOUNT_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
-          echo "R2_ACCESS_KEY_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
-          echo "R2_SECRET_ACCESS_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          write_secret() {
+            local name="$1"
+            local value="$2"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          }
+          write_secret BETTER_AUTH_SECRET "$(openssl rand -hex 32)"
+          write_secret AUDIT_HMAC_KEYS "{\"1\":\"$(openssl rand -base64 32 | tr -d '\n')\"}"
+          write_secret DEMO_ADMIN_PASSWORD "$(openssl rand -hex 24)"
+          write_secret DEMO_OWNER_PASSWORD "$(openssl rand -hex 24)"
+          write_secret DEMO_VIEWER_PASSWORD "$(openssl rand -hex 24)"
+          write_secret R2_ACCOUNT_ID "$(openssl rand -hex 16)"
+          write_secret R2_ACCESS_KEY_ID "$(openssl rand -hex 16)"
+          write_secret R2_SECRET_ACCESS_KEY "$(openssl rand -hex 32)"
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run db:migrate:deploy
