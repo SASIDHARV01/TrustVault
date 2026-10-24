@@ -3670,6 +3670,127 @@ summary:focus-visible {
 .verification-result--invalid { border-color: rgba(255, 54, 94, .3); color: #ff93a8; background: rgba(255, 54, 94, .06); }
 .override-reason { border-color: rgba(255, 54, 94, .3); border-radius: 2px; background: rgba(255, 54, 94, .05); }
 
+/* Phase 2: distinct authorization dimensions and operation telemetry */
+.vault-dimensions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 42px;
+}
+
+.vault-dimensions button {
+  position: relative;
+  min-height: 138px;
+  display: grid;
+  align-content: end;
+  justify-items: start;
+  gap: 6px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .08);
+  color: var(--plasma);
+  background: rgba(17, 17, 22, .72);
+  cursor: pointer;
+  text-align: left;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.vault-dimensions button::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(rgba(0, 245, 255, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 245, 255, .04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  transition: opacity 180ms ease;
+}
+
+.vault-dimensions button:last-child::before {
+  background:
+    linear-gradient(rgba(255, 43, 214, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 43, 214, .045) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.vault-dimensions button:hover { transform: translateY(-2px); }
+.vault-dimensions button.is-active:first-child { border-color: var(--cyan); background: linear-gradient(135deg, rgba(0, 245, 255, .09), rgba(17, 17, 22, .86)); box-shadow: 0 0 32px rgba(0, 245, 255, .08); }
+.vault-dimensions button.is-active:last-child { border-color: var(--magenta); background: linear-gradient(135deg, rgba(255, 43, 214, .09), rgba(17, 17, 22, .86)); box-shadow: 0 0 32px rgba(255, 43, 214, .08); }
+.vault-dimensions button.is-active::before { opacity: 1; }
+
+.vault-dimensions__code {
+  position: absolute;
+  z-index: 1;
+  top: 18px;
+  left: 20px;
+  color: var(--cyan);
+  font: 7px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .12em;
+}
+
+.vault-dimensions button:last-child .vault-dimensions__code { color: var(--magenta); }
+.vault-dimensions strong { position: relative; z-index: 1; font-family: "Arial Narrow", Inter, sans-serif; font-size: 22px; text-transform: uppercase; }
+.vault-dimensions small { position: relative; z-index: 1; color: var(--ink-soft); font-size: 9px; }
+.vault-dimensions button > i { position: absolute; z-index: 1; right: 22px; bottom: 18px; color: var(--cyan); font: normal 30px ui-monospace, monospace; }
+.vault-dimensions button:last-child > i { color: var(--magenta); }
+
+.document-tile--shared {
+  border-color: rgba(255, 43, 214, .18);
+  background: linear-gradient(145deg, rgba(255, 43, 214, .045), rgba(17, 17, 22, .82));
+}
+
+.document-tile--shared .document-tile__icon {
+  border-color: rgba(255, 43, 214, .38);
+  color: var(--magenta);
+  background: rgba(255, 43, 214, .08);
+}
+
+.document-tile--shared:hover { border-color: var(--magenta); }
+
+.operation-transmission {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 245, 255, .22);
+  color: var(--cyan);
+  background: rgba(0, 245, 255, .045);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.operation-transmission > span,
+.signout-progress i {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(0, 245, 255, .18);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: cyber-action-spin 650ms linear infinite;
+}
+
+.operation-transmission p { display: grid; gap: 3px; margin: 0; }
+.operation-transmission strong { font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.operation-transmission small { color: var(--ink-soft); font-size: 7px; }
+.operation-transmission--compact { margin: 10px 0; border-color: rgba(255, 43, 214, .22); color: var(--magenta); background: rgba(255, 43, 214, .04); }
+
+.signout-progress { display: inline-flex; align-items: center; gap: 7px; color: var(--cyan); }
+.signout-progress i { width: 10px; height: 10px; }
+
+.button--danger {
+  color: #ff9bae;
+  background: rgba(255, 54, 94, .07);
+}
+
+.button--danger:hover {
+  color: var(--plasma);
+  background: rgba(255, 54, 94, .16);
+  box-shadow: 0 0 25px rgba(255, 54, 94, .12);
+}
+
 @media (max-width: 1000px) {
   .cyber-nav { grid-template-columns: 1fr 1fr; }
   .cyber-nav__status { display: none; }
@@ -3700,6 +3821,7 @@ summary:focus-visible {
   .cyber-footer p,
   .cyber-footer > span { margin: 0; text-align: left; }
   .auth-story__telemetry { display: none; }
+  .vault-dimensions { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
@@ -3731,7 +3853,9 @@ summary:focus-visible {
   .cyber-marquee div,
   .brand__mark::after,
   .cyber-action-button__spinner,
-  .cyber-action-button__signal i {
+  .cyber-action-button__signal i,
+  .operation-transmission > span,
+  .signout-progress i {
     animation: none !important;
   }
 }

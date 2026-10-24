@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDocumentApiHandlers } from "./document-api-handlers";
 import { DocumentServiceError } from "./document-service";
@@ -61,12 +61,13 @@ describe("document API HTTP boundary", () => {
   });
 
   it("validates list queries and disables response caching", async () => {
-    const handlers = createDocumentApiHandlers(dependencies());
+    const listDocuments = vi.fn(dependencies().listDocuments);
+    const handlers = createDocumentApiHandlers(dependencies({ listDocuments }));
     const invalid = await handlers.list(
       new Request("https://trustvault.test/api/documents?limit=1000"),
     );
     const valid = await handlers.list(
-      new Request("https://trustvault.test/api/documents?q=salary"),
+      new Request("https://trustvault.test/api/documents?q=salary&scope=shared"),
     );
 
     expect(invalid.status).toBe(400);
@@ -74,6 +75,10 @@ describe("document API HTTP boundary", () => {
     expect(valid.headers.get("cache-control")).toBe("private, no-store");
     expect(valid.headers.get("vary")).toBe("Cookie");
     expect(valid.headers.get("x-request-id")).toBeTruthy();
+    expect(listDocuments).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({ q: "salary", scope: "shared" }),
+    );
   });
 
   it("rejects cross-origin document mutations", async () => {

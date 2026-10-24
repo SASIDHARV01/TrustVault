@@ -106,23 +106,23 @@ export async function listAccessibleDocuments(
   query: DocumentListQuery,
   database: PrismaClient = getDatabase(),
 ) {
-  const accessFilter: Prisma.DocumentWhereInput =
-    query.state === "DELETED"
-      ? actor.role === "ADMIN"
-        ? {}
-        : { ownerId: actor.id }
-      : actor.role === "ADMIN"
-        ? {}
-        : {
-            OR: [
-              { ownerId: actor.id },
-              {
-                grants: {
-                  some: { recipientId: actor.id, revokedAt: null },
-                },
-              },
-            ],
-          };
+  const activeGrant: Prisma.DocumentWhereInput = {
+    grants: { some: { recipientId: actor.id, revokedAt: null } },
+  };
+  const accessFilter: Prisma.DocumentWhereInput = (() => {
+    if (query.scope === "owned") return { ownerId: actor.id };
+    if (query.scope === "shared") {
+      if (query.state === "DELETED") {
+        return { AND: [{ ownerId: actor.id }, { ownerId: { not: actor.id } }] };
+      }
+      return { AND: [{ ownerId: { not: actor.id } }, activeGrant] };
+    }
+    if (query.state === "DELETED") {
+      return actor.role === "ADMIN" ? {} : { ownerId: actor.id };
+    }
+    if (actor.role === "ADMIN") return {};
+    return { OR: [{ ownerId: actor.id }, activeGrant] };
+  })();
 
   const requestedFilters: Prisma.DocumentWhereInput = {
     ...(query.q

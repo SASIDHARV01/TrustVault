@@ -6,6 +6,8 @@ type CyberActionButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "chi
   idleLabel: string;
   pending: boolean;
   stages: readonly string[];
+  statusLabel?: string;
+  variant?: "primary" | "ghost" | "danger";
 };
 
 export function CyberActionButton({
@@ -14,6 +16,8 @@ export function CyberActionButton({
   idleLabel,
   pending,
   stages,
+  statusLabel,
+  variant = "primary",
   ...props
 }: CyberActionButtonProps) {
   const [stageIndex, setStageIndex] = useState(0);
@@ -35,11 +39,11 @@ export function CyberActionButton({
     <button
       {...props}
       aria-busy={pending}
-      className={`button button--primary cyber-action-button ${className}`.trim()}
+      className={`button button--${variant} cyber-action-button ${className}`.trim()}
       disabled={disabled || pending}
     >
       {pending ? <span className="cyber-action-button__spinner" aria-hidden="true" /> : null}
-      <span aria-live="polite">{pending ? stages[stageIndex] : idleLabel}</span>
+      <span aria-live="polite">{pending ? statusLabel ?? stages[stageIndex] : idleLabel}</span>
       <span className="cyber-action-button__signal" aria-hidden="true">
         <i /><i /><i />
       </span>

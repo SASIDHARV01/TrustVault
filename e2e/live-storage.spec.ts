@@ -32,11 +32,14 @@ const administrator: Credentials = {
 
 async function authenticatedPage(browser: Browser, credentials: Credentials) {
   const context = await browser.newContext();
+  await context.addInitScript(() => {
+    window.sessionStorage.setItem("trustvault-cyber-intro-seen", "true");
+  });
   const page = await context.newPage();
   await page.goto("/login");
   await page.getByLabel("Email address").fill(credentials.email);
   await page.getByLabel("Password").fill(credentials.password);
-  await page.getByRole("button", { name: "Enter the vault" }).click();
+  await page.getByRole("button", { name: "Enter the secure multiverse" }).click();
   await expect(page).toHaveURL(/\/vault$/, { timeout: 30_000 });
   return { context, page };
 }
