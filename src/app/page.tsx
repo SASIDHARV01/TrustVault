@@ -1,181 +1,139 @@
 import Link from "next/link";
 
 import { BrandMark } from "@/components/brand-mark";
-import { siteConfig } from "@/lib/site-config";
 
-const workflow = [
-  {
-    number: "01",
-    title: "Upload privately",
-    copy: "Files enter private object storage. A public URL is never the key to access.",
-  },
-  {
-    number: "02",
-    title: "Grant by name",
-    copy: "Owners choose a person and give exactly read or edit access to one document.",
-  },
-  {
-    number: "03",
-    title: "Verify every action",
-    copy: "Each request is rechecked and sensitive outcomes join a tamper-evident trail.",
-  },
-];
-
-const architecture = [
-  ["Application", "Next.js + TypeScript"],
-  ["Identity", "Better Auth sessions"],
-  ["Data", "Supabase PostgreSQL"],
-  ["Documents", "Private Cloudflare R2"],
+const protocol = [
+  { code: "01 // INGEST", title: "Lock the source", copy: "Documents enter private object storage. A public URL never becomes authority.", accent: "cyan" },
+  { code: "02 // CLEARANCE", title: "Name the identity", copy: "The owner grants view or edit clearance to a specific TrustVault identity.", accent: "magenta" },
+  { code: "03 // VERIFY", title: "Challenge every request", copy: "Identity, permission, state, and version are rechecked by the server every time.", accent: "yellow" },
+  { code: "04 // EVIDENCE", title: "Seal the outcome", copy: "Allowed, denied, and failed actions join a tamper-evident audit chain.", accent: "red" },
 ];
 
 function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 10h12M11 5l5 5-5 5" />
-    </svg>
-  );
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5" /></svg>;
+}
+
+function HexIcon({ type }: { type: "identity" | "permission" | "audit" }) {
+  const paths = {
+    identity: <><circle cx="16" cy="12" r="4" /><path d="M8 26c1.5-5 5-7 8-7s6.5 2 8 7" /></>,
+    permission: <><path d="M8 15.5 13 20l11-11" /><path d="M16 3 28 8v8c0 7-4.8 11.6-12 14C8.8 27.6 4 23 4 16V8l12-5Z" /></>,
+    audit: <><path d="M8 6h16v21H8z" /><path d="M12 12h8M12 17h8M12 22h5" /></>,
+  };
+  return <svg className="hex-icon" viewBox="0 0 32 32" aria-hidden="true">{paths[type]}</svg>;
 }
 
 export default function Home() {
   return (
-    <main>
-      <nav className="nav shell" aria-label="Primary navigation">
-        <a className="brand-link" href="#top">
-          <BrandMark />
-        </a>
-        <div className="nav__links">
-          {siteConfig.navigation.map((item) => (
-            <a key={item.href} href={item.href}>
-              {item.label}
-            </a>
-          ))}
+    <main className="cyber-home">
+      <div className="cyber-home__noise" aria-hidden="true" />
+      <nav className="cyber-nav shell" aria-label="Primary navigation">
+        <a className="brand-link" href="#top"><BrandMark /></a>
+        <div className="cyber-nav__status" aria-hidden="true">
+          <span className="cyber-pulse" /> SYSTEM ONLINE <i /> AUDIT CHANNEL 0x8F32
         </div>
-        <div className="nav__auth">
-          <Link href="/login">Sign in</Link>
-          <Link className="button button--primary" href="/register">Open your vault</Link>
+        <div className="cyber-nav__auth">
+          <Link href="/login">Authenticate</Link>
+          <Link className="button button--primary" href="/register">Enter the vault</Link>
         </div>
       </nav>
 
-      <section className="hero shell" id="top">
-        <div className="hero__copy">
-          <p className="eyebrow">
-            <span /> Confidential sharing, accountable by design
+      <section className="cyber-hero shell" id="top">
+        <div className="cyber-hero__copy">
+          <p className="cyber-label"><span>SECURE MULTIVERSE</span> // DOCUMENT CLEARANCE NETWORK</p>
+          <h1>Every file enters another <em>dimension of security.</em></h1>
+          <p className="cyber-hero__lede">
+            TrustVault turns confidential sharing into a live authorization protocol.
+            Identity is verified, permission is rechecked, revocation is immediate,
+            and every outcome leaves evidence.
           </p>
-          <h1>
-            Sensitive files deserve more than a <em>share link.</em>
-          </h1>
-          <p className="hero__lede">
-            TrustVault gives document owners precise control, makes revocation
-            immediate, and records both successful and refused actions in a
-            trail built to reveal tampering.
-          </p>
-          <div className="hero__actions">
-            <Link className="button button--primary" href="/register">
-              Create secure account <ArrowIcon />
-            </Link>
-            <a className="button button--ghost" href="#security">
-              Read the security promise
-            </a>
+          <div className="cyber-hero__actions">
+            <Link className="button button--primary" href="/register">Initialize secure identity <ArrowIcon /></Link>
+            <a className="button button--ghost" href="#breach-scenario">Run the scenario</a>
           </div>
-          <ul className="trust-list" aria-label="Core safeguards">
-            {siteConfig.safeguards.map((safeguard) => (
-              <li key={safeguard}>
-                <span aria-hidden="true">✓</span> {safeguard}
-              </li>
-            ))}
-          </ul>
+          <div className="cyber-hero__telemetry" aria-label="TrustVault safeguards">
+            <span><i>01</i> PRIVATE STORAGE</span>
+            <span><i>02</i> LIVE REVOCATION</span>
+            <span><i>03</i> VERIFIABLE AUDIT</span>
+          </div>
         </div>
 
-        <div className="vault-card" aria-label="Access decision preview">
-          <div className="vault-card__glow" />
-          <div className="vault-card__topline">
-            <span className="status-dot" /> Live authorization decision
-            <span>TV-006</span>
+        <div className="multiverse-console" aria-label="Live authorization simulation">
+          <div className="multiverse-console__header">
+            <span><i className="cyber-pulse" /> AUTHORIZATION ENGINE</span><code>TV-NODE//06</code>
           </div>
-          <div className="document-card">
-            <div className="document-card__icon" aria-hidden="true">
-              PDF
-            </div>
-            <div>
-              <strong>Compensation Review.pdf</strong>
-              <span>Confidential · 2.4 MB</span>
-            </div>
-            <span className="document-card__lock">Locked</span>
+          <div className="multiverse-portal" aria-hidden="true">
+            <span className="multiverse-portal__ring multiverse-portal__ring--one" />
+            <span className="multiverse-portal__ring multiverse-portal__ring--two" />
+            <span className="multiverse-portal__ring multiverse-portal__ring--three" />
+            <span className="multiverse-portal__document">PDF<small>CLASSIFIED</small></span>
+            <span className="multiverse-portal__orbit multiverse-portal__orbit--one">IDENTITY</span>
+            <span className="multiverse-portal__orbit multiverse-portal__orbit--two">POLICY</span>
+            <span className="multiverse-portal__orbit multiverse-portal__orbit--three">AUDIT</span>
           </div>
-          <div className="decision-path">
-            <div>
-              <span className="path-icon">1</span>
-              <p><strong>Identity verified</strong><small>Database session is active</small></p>
-            </div>
-            <div>
-              <span className="path-icon">2</span>
-              <p><strong>Permission checked</strong><small>Named READ grant found</small></p>
-            </div>
-            <div>
-              <span className="path-icon path-icon--success">✓</span>
-              <p><strong>Access allowed</strong><small>Audit event #8F32 appended</small></p>
-            </div>
+          <div className="authorization-sequence">
+            <div><HexIcon type="identity" /><span><small>IDENTITY MATRIX</small><strong>Session verified</strong></span><b>PASS</b></div>
+            <div><HexIcon type="permission" /><span><small>CLEARANCE LAYER</small><strong>Named READ grant</strong></span><b>PASS</b></div>
+            <div><HexIcon type="audit" /><span><small>EVIDENCE CHANNEL</small><strong>Event sealed #8F32</strong></span><b>LIVE</b></div>
           </div>
-          <div className="revocation-note">
-            <span>↻</span>
-            <p><strong>Revoke now</strong><small>The next request is denied—no stale link survives.</small></p>
-          </div>
+          <div className="multiverse-console__footer"><span>DECISION</span><strong>ACCESS GRANTED</strong><code>12.8ms</code></div>
         </div>
       </section>
 
-      <section className="proof-strip" id="security">
-        <div className="shell proof-strip__inner">
-          <p>Designed around a simple rule</p>
-          <blockquote>
-            “The server decides. <span>Every route. Every time.</span>”
-          </blockquote>
-          <span className="proof-strip__tag">Deny by default</span>
+      <section className="cyber-marquee" aria-hidden="true">
+        <div>DENY BY DEFAULT <span>◆</span> SERVER AUTHORIZATION <span>◆</span> IMMEDIATE REVOCATION <span>◆</span> TAMPER-EVIDENT HISTORY <span>◆</span> DENY BY DEFAULT <span>◆</span> SERVER AUTHORIZATION</div>
+      </section>
+
+      <section className="breach-section shell" id="breach-scenario">
+        <div className="section-signal"><span>INCIDENT SIMULATION // 001</span><i /></div>
+        <div className="breach-heading">
+          <h2>A salary letter was shared.<br />Then the situation changed.</h2>
+          <p>A normal link keeps travelling. TrustVault forces every new request back through the authorization boundary.</p>
+        </div>
+        <div className="scenario-grid">
+          <article className="scenario-card scenario-card--threat">
+            <header><span>WITHOUT CONTROL</span><strong>EXPOSURE PATH</strong></header>
+            <div className="scenario-document"><i>PDF</i><span><strong>Salary-Letter.pdf</strong><small>Forwarded link remains active</small></span></div>
+            <div className="scenario-path" aria-hidden="true"><span>OWNER</span><i /><span>RECIPIENT</span><i /><span>UNKNOWN</span></div>
+            <footer><span>!</span> Permission changed. Old link still works.</footer>
+          </article>
+          <article className="scenario-card scenario-card--secure">
+            <header><span>WITH TRUSTVAULT</span><strong>ZERO-STALE ACCESS</strong></header>
+            <div className="scenario-document"><i>PDF</i><span><strong>Salary-Letter.pdf</strong><small>Every request returns to policy</small></span></div>
+            <div className="scenario-path" aria-hidden="true"><span>IDENTITY</span><i /><span>POLICY</span><i className="is-blocked" /><span>DENIED</span></div>
+            <footer><span>✓</span> Grant revoked. The next request is denied.</footer>
+          </article>
         </div>
       </section>
 
-      <section className="section shell" id="workflow">
-        <div className="section__heading">
-          <p className="eyebrow"><span /> How it works</p>
-          <h2>Three steps. No hidden trust.</h2>
-          <p>Every layer has one job, and no browser control is mistaken for security.</p>
+      <section className="protocol-section shell" id="protocol">
+        <div className="section-signal"><span>TRUST PROTOCOL // FOUR LAYERS</span><i /></div>
+        <div className="protocol-heading">
+          <h2>The browser asks.<br /><em>The server decides.</em></h2>
+          <p>No hidden trust. No permission implied by a page, cookie, or guessed URL.</p>
         </div>
-        <div className="workflow-grid">
-          {workflow.map((item) => (
-            <article key={item.number} className="workflow-card">
-              <span className="workflow-card__number">{item.number}</span>
-              <h3>{item.title}</h3>
-              <p>{item.copy}</p>
+        <div className="protocol-grid">
+          {protocol.map((item) => (
+            <article className={`protocol-card protocol-card--${item.accent}`} key={item.code}>
+              <span>{item.code}</span><h3>{item.title}</h3><p>{item.copy}</p><i aria-hidden="true" />
             </article>
           ))}
         </div>
       </section>
 
-      <section className="section shell architecture" id="architecture">
-        <div className="architecture__copy">
-          <p className="eyebrow"><span /> Deliberately boring infrastructure</p>
-          <h2>A small stack we can understand and defend.</h2>
-          <p>
-            One application, one authorization boundary, managed data services,
-            and tests written from an attacker&apos;s point of view.
-          </p>
-          <p className="release-note">
-            Public repository arrives with the release <ArrowIcon />
-          </p>
+      <section className="revocation-section">
+        <div className="shell revocation-section__inner">
+          <div className="revocation-orbit" aria-hidden="true"><span>REVOKE</span><i /><i /><i /></div>
+          <div>
+            <p className="cyber-label"><span>CONTROL RETURNS TO THE OWNER</span></p>
+            <h2>End access now.<br />Not after the link expires.</h2>
+            <p>Revocation changes the database truth. The next preview, download, metadata request, or version action is authorized against that new truth.</p>
+            <Link className="button button--primary" href="/register">Create your secure workspace <ArrowIcon /></Link>
+          </div>
         </div>
-        <dl className="stack-list">
-          {architecture.map(([label, value]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
       </section>
 
-      <footer className="footer shell">
-        <BrandMark />
-        <p>Built for confidential work—and honest security evidence.</p>
-        <span>© 2026 TrustVault</span>
+      <footer className="cyber-footer shell">
+        <BrandMark /><p>CONFIDENTIAL SHARING // ACCOUNTABLE BY DESIGN</p><span>© 2026 TRUSTVAULT // NODE ONLINE</span>
       </footer>
     </main>
   );

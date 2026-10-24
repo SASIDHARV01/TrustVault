@@ -13,12 +13,11 @@ export function SignOutButton() {
     setPending(true);
     await authClient.signOut();
     router.replace("/login");
-    router.refresh();
   }
 
   return (
     <button className="app-nav__signout" disabled={pending} onClick={signOut} type="button">
-      {pending ? "Signing out…" : "Sign out"}
+      {pending ? <span className="signout-progress"><i aria-hidden="true" /> Closing secure channel…</span> : "Sign out"}
     </button>
   );
 }

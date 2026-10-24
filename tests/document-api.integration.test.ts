@@ -180,6 +180,34 @@ describeWithDatabase("document metadata API PostgreSQL integration", () => {
     );
   });
 
+  it("separates owned and explicitly shared document scopes in PostgreSQL", async () => {
+    currentActor = { id: users.reader, role: "MEMBER" };
+    const sharedResult = await handlers.list(
+      request("/api/documents?scope=shared"),
+    );
+    expect((await body(sharedResult)).data?.documents?.map(({ id }) => id)).toEqual([
+      targetDocumentId,
+    ]);
+
+    const readerOwnedResult = await handlers.list(
+      request("/api/documents?scope=owned"),
+    );
+    expect((await body(readerOwnedResult)).data?.documents).toEqual([]);
+
+    currentActor = { id: users.unrelated, role: "MEMBER" };
+    const ownerResult = await handlers.list(
+      request("/api/documents?scope=owned"),
+    );
+    expect((await body(ownerResult)).data?.documents?.map(({ id }) => id)).toEqual([
+      unrelatedDocumentId,
+    ]);
+
+    const unrelatedSharedResult = await handlers.list(
+      request("/api/documents?scope=shared"),
+    );
+    expect((await body(unrelatedSharedResult)).data?.documents).toEqual([]);
+  });
+
   it("combines name, owner, category, date, and sorting with the access predicate", async () => {
     currentActor = { id: users.reader, role: "MEMBER" };
     const readerFiltered = await handlers.list(request(

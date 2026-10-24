@@ -20,18 +20,22 @@ const administrator: Credentials = {
   email: required("DEMO_ADMIN_EMAIL"),
   password: required("DEMO_ADMIN_PASSWORD"),
 };
+const e2eClientAddress = `security-e2e-${Date.now()}`;
 
 async function authenticatedPage(
   browser: Browser,
   credentials: Credentials,
 ) {
   const context = await browser.newContext();
+  await context.addInitScript(() => {
+    window.sessionStorage.setItem("trustvault-cyber-intro-seen", "true");
+  });
   const page = await context.newPage();
   await page.goto("/login");
   await page.getByLabel("Email address").fill(credentials.email);
   await page.getByLabel("Password").fill(credentials.password);
-  await page.getByRole("button", { name: "Enter the vault" }).click();
-  await expect(page).toHaveURL(/\/vault$/);
+  await page.getByRole("button", { name: "Enter the secure multiverse" }).click();
+  await expect(page).toHaveURL(/\/vault$/, { timeout: 30_000 });
   return { context, page };
 }
 
@@ -39,6 +43,7 @@ function mutationHeaders() {
   return {
     Origin: required("APP_URL"),
     "Content-Type": "application/json",
+    "X-Forwarded-For": e2eClientAddress,
   };
 }
 
@@ -47,6 +52,7 @@ async function closeAll(contexts: BrowserContext[]) {
 }
 
 test("enforces cross-user, revocation, CSRF, XSS, admin, cache and audit boundaries", async ({ browser }) => {
+  test.setTimeout(300_000);
   const ownerSession = await authenticatedPage(browser, owner);
   const viewerSession = await authenticatedPage(browser, viewer);
   const adminSession = await authenticatedPage(browser, administrator);
@@ -106,6 +112,22 @@ test("enforces cross-user, revocation, CSRF, XSS, admin, cache and audit boundar
       expect(grant.status()).toBe(201);
       grantId = ((await grant.json()) as { data: { grant: { id: string } } }).data.grant.id;
 
+      const sharedDimension = await viewerSession.page.request.get(
+        `/api/documents?scope=shared&q=${encodeURIComponent(marker)}`,
+      );
+      const viewerOwnedDimension = await viewerSession.page.request.get(
+        `/api/documents?scope=owned&q=${encodeURIComponent(marker)}`,
+      );
+      expect(await sharedDimension.text()).toContain(documentId!);
+      expect(await viewerOwnedDimension.text()).not.toContain(documentId!);
+
+      await viewerSession.page.goto("/vault");
+      await expect(viewerSession.page.getByRole("heading", { name: "My documents" })).toBeVisible();
+      await expect(viewerSession.page.getByText(marker, { exact: false })).toHaveCount(0);
+      await viewerSession.page.getByRole("tab", { name: /Shared Dimensions/ }).click();
+      await expect(viewerSession.page.getByRole("heading", { name: "Shared with me" })).toBeVisible();
+      await expect(viewerSession.page.getByText(marker, { exact: false })).toBeVisible({ timeout: 30_000 });
+
       expect((await viewerSession.page.request.get(`/api/documents/${documentId}`)).status()).toBe(200);
       expect((await viewerSession.page.request.patch(`/api/documents/${documentId}`, {
         headers: mutationHeaders(),
@@ -118,6 +140,9 @@ test("enforces cross-user, revocation, CSRF, XSS, admin, cache and audit boundar
       );
       expect(revoked.status()).toBe(200);
       expect((await viewerSession.page.request.get(`/api/documents/${documentId}`)).status()).toBe(404);
+      expect(await (await viewerSession.page.request.get(
+        `/api/documents?scope=shared&q=${encodeURIComponent(marker)}`,
+      )).text()).not.toContain(documentId!);
     });
 
     await test.step("administrator metadata visibility grants no owner mutation powers", async () => {

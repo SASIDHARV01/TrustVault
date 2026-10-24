@@ -9,6 +9,14 @@ import {
   firstValidationError,
   registrationSchema,
 } from "@/lib/auth-validation";
+import { CyberActionButton } from "@/components/cyber/cyber-action-button";
+
+const registrationStages = [
+  "Validating identity",
+  "Securing credentials",
+  "Creating vault profile",
+  "Opening secure channel",
+] as const;
 
 export function RegisterForm({ callbackPath }: { callbackPath: string }) {
   const router = useRouter();
@@ -45,7 +53,6 @@ export function RegisterForm({ callbackPath }: { callbackPath: string }) {
     }
 
     router.replace(callbackPath);
-    router.refresh();
   }
 
   return (
@@ -85,9 +92,13 @@ export function RegisterForm({ callbackPath }: { callbackPath: string }) {
         <small>Use 12–128 characters. A password manager is recommended.</small>
       </label>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button className="button button--primary auth-submit" disabled={pending} type="submit">
-        {pending ? "Creating account…" : "Create secure account"}
-      </button>
+      <CyberActionButton
+        className="auth-submit"
+        idleLabel="Create secure identity"
+        pending={pending}
+        stages={registrationStages}
+        type="submit"
+      />
       <p className="auth-form__switch">
         Already have an account? <Link href={`/login?next=${encodeURIComponent(callbackPath)}`}>Sign in</Link>
       </p>

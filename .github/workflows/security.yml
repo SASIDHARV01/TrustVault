@@ -2,7 +2,7 @@ name: Security quality gate
 
 on:
   push:
-    branches: [main]
+    branches: [main, production-deployment]
   pull_request:
 
 permissions:
@@ -17,8 +17,8 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: trustvault
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -29,22 +29,13 @@ jobs:
     env:
       APP_URL: http://127.0.0.1:3002
       E2E_BASE_URL: http://127.0.0.1:3002
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
-      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trustvault
-      BETTER_AUTH_SECRET: ci-only-better-auth-secret-at-least-32-characters
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/trustvault
+      DIRECT_URL: postgresql://postgres@127.0.0.1:5432/trustvault
+      TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/trustvault
       AUDIT_HMAC_KEY_VERSION: "1"
-      # Matches the deterministic non-production key used by integration fixtures.
-      AUDIT_HMAC_KEYS: '{"1":"FRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRU="}'
       DEMO_ADMIN_EMAIL: admin@trustvault.local
-      DEMO_ADMIN_PASSWORD: CiOnlyAdminPassword!2026
       DEMO_OWNER_EMAIL: owner@trustvault.local
-      DEMO_OWNER_PASSWORD: CiOnlyOwnerPassword!2026
       DEMO_VIEWER_EMAIL: viewer@trustvault.local
-      DEMO_VIEWER_PASSWORD: CiOnlyViewerPassword!2026
-      R2_ACCOUNT_ID: "11111111111111111111111111111111"
-      R2_ACCESS_KEY_ID: "22222222222222222222222222222222"
-      R2_SECRET_ACCESS_KEY: "3333333333333333333333333333333333333333333333333333333333333333"
       R2_BUCKET_NAME: trustvault-ci-placeholder
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +43,23 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Generate ephemeral CI credentials
+        shell: bash
+        run: |
+          write_secret() {
+            local name="$1"
+            local value="$2"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          }
+          write_secret BETTER_AUTH_SECRET "$(openssl rand -hex 32)"
+          write_secret AUDIT_HMAC_KEYS "{\"1\":\"$(openssl rand -base64 32 | tr -d '\n')\"}"
+          write_secret DEMO_ADMIN_PASSWORD "$(openssl rand -hex 24)"
+          write_secret DEMO_OWNER_PASSWORD "$(openssl rand -hex 24)"
+          write_secret DEMO_VIEWER_PASSWORD "$(openssl rand -hex 24)"
+          write_secret R2_ACCOUNT_ID "$(openssl rand -hex 16)"
+          write_secret R2_ACCESS_KEY_ID "$(openssl rand -hex 16)"
+          write_secret R2_SECRET_ACCESS_KEY "$(openssl rand -hex 32)"
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run db:migrate:deploy

@@ -10,6 +10,7 @@ import {
 describe("document API validation", () => {
   it("normalizes safe list defaults and bounded pagination", () => {
     expect(documentListQuerySchema.parse({})).toEqual({
+      scope: "all",
       state: "ACTIVE",
       sort: "createdAt",
       order: "desc",
@@ -19,6 +20,7 @@ describe("document API validation", () => {
     expect(
       documentListQuerySchema.parse({ q: "  salary  ", page: "2", limit: "50" }),
     ).toEqual({
+      scope: "all",
       state: "ACTIVE",
       q: "salary",
       sort: "createdAt",
@@ -43,6 +45,9 @@ describe("document API validation", () => {
       createdTo: "2026-01-01T00:00:00.000Z",
     }).success).toBe(false);
     expect(documentListQuerySchema.safeParse({ role: "ADMIN" }).success).toBe(false);
+    expect(documentListQuerySchema.safeParse({ scope: "owned" }).success).toBe(true);
+    expect(documentListQuerySchema.safeParse({ scope: "shared" }).success).toBe(true);
+    expect(documentListQuerySchema.safeParse({ scope: "global" }).success).toBe(false);
   });
 
   it("accepts opaque application IDs but rejects path-like values", () => {

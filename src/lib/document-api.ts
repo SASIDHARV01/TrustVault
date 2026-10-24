@@ -31,6 +31,7 @@ export const documentIdSchema = z
 
 export const documentListQuerySchema = z
   .object({
+    scope: z.enum(["all", "owned", "shared"]).default("all"),
     q: optionalSearchText(100),
     owner: optionalSearchText(100),
     ownerId: documentIdSchema.optional(),

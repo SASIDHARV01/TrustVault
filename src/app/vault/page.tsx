@@ -25,11 +25,11 @@ export default async function VaultPage({
 
         <div className="workspace-heading workspace-heading--dashboard">
           <div>
-            <p className="eyebrow"><span /> Private document workspace</p>
-            <h1>Your secure vault</h1>
+            <p className="eyebrow"><span /> Authorization-separated workspace</p>
+            <h1>Secure dimensions</h1>
             <p>
-              Organize, share, and inspect confidential files. Every request is
-              authorized against the latest permissions and recorded for accountability.
+              Your owned documents and granted clearances now occupy separate
+              server-filtered dimensions. Every request still returns to live policy.
             </p>
           </div>
           <span className="session-chip"><i /> Protected session</span>

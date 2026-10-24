@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { CyberActionButton } from "@/components/cyber/cyber-action-button";
 
 import {
   apiJson,
@@ -22,8 +24,14 @@ type DocumentListResponse = {
 };
 
 type DetailSection = "overview" | "versions" | "sharing" | "activity";
+type VaultScope = "owned" | "shared";
 
 const emptyPagination: Pagination = { page: 1, limit: 12, total: 0, totalPages: 0 };
+const uploadStages = ["Creating protected record", "Opening private storage channel", "Sealing immutable version"] as const;
+const metadataStages = ["Validating owner clearance", "Saving protected metadata", "Recording audit event"] as const;
+const versionStages = ["Checking edit clearance", "Uploading immutable version", "Sealing audit event"] as const;
+const grantStages = ["Checking recipient identity", "Applying clearance", "Recording authorization event"] as const;
+const revokeStages = ["Revoking clearance", "Invalidating the next request", "Recording revocation"] as const;
 
 function useNotice() {
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -34,7 +42,23 @@ function useNotice() {
   return { notice, show };
 }
 
+function useDebouncedValue<T>(value: T, delayMilliseconds = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedValue(value),
+      delayMilliseconds,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMilliseconds, value]);
+
+  return debouncedValue;
+}
+
 export function VaultDashboard({ userId }: { userId: string }) {
+  const [scope, setScope] = useState<VaultScope>("owned");
+  const [scopeTotals, setScopeTotals] = useState<Record<VaultScope, number | null>>({ owned: null, shared: null });
   const [documents, setDocuments] = useState<VaultDocument[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pagination, setPagination] = useState(emptyPagination);
@@ -47,11 +71,19 @@ export function VaultDashboard({ userId }: { userId: string }) {
   const [createdTo, setCreatedTo] = useState("");
   const [state, setState] = useState<"ACTIVE" | "DELETED">("ACTIVE");
   const [sort, setSort] = useState("updatedAt");
-  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState<Record<VaultScope, number>>({ owned: 1, shared: 1 });
   const [showUpload, setShowUpload] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
   const [selected, setSelected] = useState<VaultDocument | null>(null);
   const { notice, show } = useNotice();
+  const debouncedQuery = useDebouncedValue(query);
+  const debouncedCategoryName = useDebouncedValue(categoryName);
+  const debouncedOwner = useDebouncedValue(owner);
+  const page = pages[scope];
+
+  const resetPage = useCallback(() => {
+    setPages((current) => ({ ...current, [scope]: 1 }));
+  }, [scope]);
 
   const loadCategories = useCallback(async () => {
     const result = await apiJson<{ data: { categories: Category[] } }>("/api/categories");
@@ -63,10 +95,11 @@ export function VaultDashboard({ userId }: { userId: string }) {
     try {
       const result = await apiJson<DocumentListResponse>(
         `/api/documents${queryString({
-          q: query,
+          scope,
+          q: debouncedQuery,
           categoryId,
-          category: categoryName,
-          owner,
+          category: debouncedCategoryName,
+          owner: debouncedOwner,
           createdFrom: dateBoundary(createdFrom, false),
           createdTo: dateBoundary(createdTo, true),
           state,
@@ -78,12 +111,13 @@ export function VaultDashboard({ userId }: { userId: string }) {
       );
       setDocuments(result.data.documents);
       setPagination(result.data.pagination);
+      setScopeTotals((current) => ({ ...current, [scope]: result.data.pagination.total }));
     } catch (error) {
       show("error", readableError(error));
     } finally {
       setLoading(false);
     }
-  }, [categoryId, categoryName, createdFrom, createdTo, owner, page, query, show, sort, state]);
+  }, [categoryId, createdFrom, createdTo, debouncedCategoryName, debouncedOwner, debouncedQuery, page, scope, show, sort, state]);
 
   useEffect(() => {
     void loadDocuments();
@@ -93,13 +127,23 @@ export function VaultDashboard({ userId }: { userId: string }) {
     void loadCategories().catch((error) => show("error", readableError(error)));
   }, [loadCategories, show]);
 
-  const owned = useMemo(
-    () => documents.filter((document) => document.access === "OWNER").length,
-    [documents],
-  );
-
   function refresh() {
-    void Promise.all([loadDocuments(), loadCategories()]);
+    void Promise.all([
+      loadDocuments(),
+      ...(scope === "owned" ? [loadCategories()] : []),
+    ]);
+  }
+
+  function switchScope(nextScope: VaultScope) {
+    if (nextScope === scope) return;
+    setSelected(null);
+    setDocuments([]);
+    setPagination({ ...emptyPagination, page: pages[nextScope] });
+    if (nextScope === "shared") {
+      setState("ACTIVE");
+      setCategoryId("");
+    }
+    setScope(nextScope);
   }
 
   return (
@@ -110,10 +154,25 @@ export function VaultDashboard({ userId }: { userId: string }) {
         </div>
       ) : null}
 
+      <div className="vault-dimensions" role="tablist" aria-label="Vault workspaces">
+        <button aria-selected={scope === "owned"} className={scope === "owned" ? "is-active" : ""} onClick={() => switchScope("owned")} role="tab" type="button">
+          <span className="vault-dimensions__code">01 // OWNER CLEARANCE</span>
+          <strong>My Vault</strong>
+          <small>Documents you control, organize, and share.</small>
+          <i>{scopeTotals.owned ?? "—"}</i>
+        </button>
+        <button aria-selected={scope === "shared"} className={scope === "shared" ? "is-active" : ""} onClick={() => switchScope("shared")} role="tab" type="button">
+          <span className="vault-dimensions__code">02 // GRANTED CLEARANCE</span>
+          <strong>Shared Dimensions</strong>
+          <small>Documents another owner has opened to you.</small>
+          <i>{scopeTotals.shared ?? "—"}</i>
+        </button>
+      </div>
+
       <div className="vault-stats" aria-label="Document summary">
-        <article><span>Visible documents</span><strong>{pagination.total}</strong><small>Authorized results only</small></article>
-        <article><span>Owned on this page</span><strong>{owned}</strong><small>You control sharing</small></article>
-        <article><span>Categories</span><strong>{categories.length}</strong><small>Private to your account</small></article>
+        <article><span>Current matches</span><strong>{pagination.total}</strong><small>Server-filtered {scope} records</small></article>
+        <article><span>Security boundary</span><strong>{scope === "owned" ? "FULL" : "GRANT"}</strong><small>{scope === "owned" ? "Owner authority" : "Permission limited"}</small></article>
+        <article><span>{scope === "owned" ? "Categories" : "Active clearance"}</span><strong>{scope === "owned" ? categories.length : documents.filter((document) => document.access === "EDIT").length}</strong><small>{scope === "owned" ? "Private organization" : "Editable on this page"}</small></article>
       </div>
 
       <div className="vault-toolbar">
@@ -121,42 +180,41 @@ export function VaultDashboard({ userId }: { userId: string }) {
           <span aria-hidden="true">⌕</span>
           <input
             aria-label="Search documents"
-            onChange={(event) => { setQuery(event.target.value); setPage(1); }}
+            onChange={(event) => { setQuery(event.target.value); resetPage(); }}
             placeholder="Search by document name…"
             type="search"
             value={query}
           />
         </label>
-        <select aria-label="Filter by category" onChange={(event) => { setCategoryId(event.target.value); setPage(1); }} value={categoryId}>
+        {scope === "owned" ? <select aria-label="Filter by category" onChange={(event) => { setCategoryId(event.target.value); resetPage(); }} value={categoryId}>
           <option value="">All categories</option>
           {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-        </select>
-        <select aria-label="Document state" onChange={(event) => { setState(event.target.value as "ACTIVE" | "DELETED"); setPage(1); }} value={state}>
-          <option value="ACTIVE">Active documents</option>
-          <option value="DELETED">Trash</option>
-        </select>
-        <select aria-label="Sort documents" onChange={(event) => { setSort(event.target.value); setPage(1); }} value={sort}>
+        </select> : null}
+        {scope === "owned" ? <select aria-label="Document state" onChange={(event) => { setState(event.target.value as "ACTIVE" | "DELETED"); resetPage(); }} value={state}>
+          <option value="ACTIVE">Active documents</option><option value="DELETED">Trash</option>
+        </select> : null}
+        <select aria-label="Sort documents" onChange={(event) => { setSort(event.target.value); resetPage(); }} value={sort}>
           <option value="updatedAt">Recently updated</option>
           <option value="createdAt">Recently created</option>
           <option value="name">Name A–Z</option>
         </select>
-        <button className="icon-button" onClick={() => setShowCategories(true)} type="button">Categories</button>
-        <button className="button button--primary vault-upload-button" onClick={() => setShowUpload(true)} type="button">＋ Upload document</button>
+        {scope === "owned" ? <button className="icon-button" onClick={() => setShowCategories(true)} type="button">Categories</button> : null}
+        {scope === "owned" ? <button className="button button--primary vault-upload-button" onClick={() => setShowUpload(true)} type="button">＋ Upload document</button> : null}
       </div>
       <details className="advanced-filters">
         <summary>More search filters <span>owner, category name, and creation date</span></summary>
         <div>
-          <label>Owner name or email<input onChange={(event) => { setOwner(event.target.value); setPage(1); }} placeholder="Search authorized owners…" value={owner} /></label>
-          <label>Category name<input onChange={(event) => { setCategoryName(event.target.value); setPage(1); }} placeholder="Search category names…" value={categoryName} /></label>
-          <label>Created from<input onChange={(event) => { setCreatedFrom(event.target.value); setPage(1); }} type="date" value={createdFrom} /></label>
-          <label>Created to<input onChange={(event) => { setCreatedTo(event.target.value); setPage(1); }} type="date" value={createdTo} /></label>
-          <button className="text-button" onClick={() => { setOwner(""); setCategoryName(""); setCreatedFrom(""); setCreatedTo(""); setCategoryId(""); setPage(1); }} type="button">Clear filters</button>
+          <label>Owner name or email<input onChange={(event) => { setOwner(event.target.value); resetPage(); }} placeholder="Search authorized owners…" value={owner} /></label>
+          <label>Category name<input onChange={(event) => { setCategoryName(event.target.value); resetPage(); }} placeholder="Search category names…" value={categoryName} /></label>
+          <label>Created from<input onChange={(event) => { setCreatedFrom(event.target.value); resetPage(); }} type="date" value={createdFrom} /></label>
+          <label>Created to<input onChange={(event) => { setCreatedTo(event.target.value); resetPage(); }} type="date" value={createdTo} /></label>
+          <button className="text-button" onClick={() => { setOwner(""); setCategoryName(""); setCreatedFrom(""); setCreatedTo(""); setCategoryId(""); resetPage(); }} type="button">Clear filters</button>
         </div>
       </details>
 
       <section className="documents-panel" aria-busy={loading}>
         <div className="panel-heading">
-          <div><p className="card-kicker">Secure workspace</p><h2>{state === "ACTIVE" ? "Your documents" : "Deleted documents"}</h2></div>
+          <div><p className="card-kicker">{scope === "owned" ? "Owner-controlled dimension" : "Permission-gated dimension"}</p><h2>{scope === "shared" ? "Shared with me" : state === "ACTIVE" ? "My documents" : "Deleted documents"}</h2></div>
           <span>{pagination.total} result{pagination.total === 1 ? "" : "s"}</span>
         </div>
 
@@ -167,9 +225,9 @@ export function VaultDashboard({ userId }: { userId: string }) {
         ) : documents.length ? (
           <div className="document-grid">
             {documents.map((document) => (
-              <button className="document-tile" key={document.id} onClick={() => setSelected(document)} type="button">
+              <button className={`document-tile document-tile--${scope}`} key={document.id} onClick={() => setSelected(document)} type="button">
                 <span className="document-tile__icon" aria-hidden="true">{document.state === "DELETED" ? "×" : "▤"}</span>
-                <span className="access-badge">{document.access.replace("_", " ")}</span>
+                <span className="access-badge">{document.access === "OWNER" ? "OWNER CLEARANCE" : document.access === "EDIT" ? "EDIT CLEARANCE" : "VIEW CLEARANCE"}</span>
                 <strong>{document.name}</strong>
                 <small>{document.category?.name ?? "Uncategorized"}</small>
                 <span className="document-tile__meta"><span>{document.owner.id === userId ? "You" : document.owner.name}</span><time>{formatDate(document.updatedAt)}</time></span>
@@ -179,17 +237,17 @@ export function VaultDashboard({ userId }: { userId: string }) {
         ) : (
           <div className="panel-empty">
             <span aria-hidden="true">□</span>
-            <h3>{state === "DELETED" ? "Your trash is empty." : "No documents match this view."}</h3>
-            <p>{state === "DELETED" ? "Deleted documents you own can be restored from here." : "Try another filter or upload your first protected document."}</p>
-            {state === "ACTIVE" ? <button className="button button--primary" onClick={() => setShowUpload(true)} type="button">Upload a document</button> : null}
+            <h3>{scope === "shared" ? "No active clearances found." : state === "DELETED" ? "Your trash is empty." : "No documents match this view."}</h3>
+            <p>{scope === "shared" ? "When an owner grants you view or edit clearance, that document will appear in this separate dimension." : state === "DELETED" ? "Deleted documents you own can be restored from here." : "Try another filter or upload your first protected document."}</p>
+            {scope === "owned" && state === "ACTIVE" ? <button className="button button--primary" onClick={() => setShowUpload(true)} type="button">Upload a document</button> : null}
           </div>
         )}
 
         {pagination.totalPages > 1 ? (
           <nav className="pagination" aria-label="Document pages">
-            <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} type="button">← Previous</button>
+            <button disabled={page <= 1} onClick={() => setPages((current) => ({ ...current, [scope]: current[scope] - 1 }))} type="button">← Previous</button>
             <span>Page {page} of {pagination.totalPages}</span>
-            <button disabled={page >= pagination.totalPages} onClick={() => setPage((value) => value + 1)} type="button">Next →</button>
+            <button disabled={page >= pagination.totalPages} onClick={() => setPages((current) => ({ ...current, [scope]: current[scope] + 1 }))} type="button">Next →</button>
           </nav>
         ) : null}
       </section>
@@ -197,8 +255,18 @@ export function VaultDashboard({ userId }: { userId: string }) {
       {showUpload ? (
         <UploadDialog
           categories={categories}
-          onClose={() => { setShowUpload(false); refresh(); }}
-          onCreated={(message) => { setShowUpload(false); show("success", message); refresh(); }}
+          onClose={() => setShowUpload(false)}
+          onCreated={(document, message) => {
+            setScope("owned");
+            setShowUpload(false);
+            setCategories((current) => current.map((category) =>
+              category.id === document.category?.id
+                ? { ...category, activeDocumentCount: category.activeDocumentCount + 1 }
+                : category,
+            ));
+            show("success", message);
+            void loadDocuments();
+          }}
         />
       ) : null}
       {showCategories ? (
@@ -216,8 +284,11 @@ export function VaultDashboard({ userId }: { userId: string }) {
           onClose={() => setSelected(null)}
           onChanged={(updated, message) => {
             setSelected(updated);
+            setDocuments((current) => current.map((document) =>
+              document.id === updated.id ? updated : document,
+            ));
             show("success", message);
-            refresh();
+            void loadDocuments();
           }}
           onRemoved={(message) => { setSelected(null); show("success", message); refresh(); }}
           show={show}
@@ -252,10 +323,11 @@ function DialogFrame({ title, subtitle, onClose, children, wide = false }: {
 function UploadDialog({ categories, onClose, onCreated }: {
   categories: Category[];
   onClose: () => void;
-  onCreated: (message: string) => void;
+  onCreated: (document: VaultDocument, message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState<string>(uploadStages[0]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -263,6 +335,7 @@ function UploadDialog({ categories, onClose, onCreated }: {
     const file = form.get("file");
     if (!(file instanceof File) || !file.size) return setError("Choose a PDF, PNG, or JPEG file.");
     setBusy(true);
+    setStatus(uploadStages[0]);
     setError("");
     let documentId: string | null = null;
     try {
@@ -275,10 +348,15 @@ function UploadDialog({ categories, onClose, onCreated }: {
         }),
       });
       documentId = created.data.document.id;
+      setStatus(uploadStages[1]);
       const upload = new FormData();
       upload.set("file", file);
       await apiJson(`/api/documents/${documentId}/versions`, { method: "POST", body: upload });
-      onCreated("Document and its first immutable version were uploaded.");
+      setStatus(uploadStages[2]);
+      onCreated(
+        created.data.document,
+        "Document and its first immutable version were uploaded.",
+      );
     } catch (caught) {
       setError(documentId ? `The document record was created, but the file upload failed. Open it and retry. ${readableError(caught)}` : readableError(caught));
     } finally {
@@ -294,7 +372,8 @@ function UploadDialog({ categories, onClose, onCreated }: {
         <label>Description<textarea maxLength={1000} name="description" placeholder="Optional context for authorized viewers" rows={3} /></label>
         <label>Category<select name="categoryId"><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
         <label className="file-drop">File<input accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" name="file" required type="file" /><small>PDF, PNG or JPEG · maximum 10 MB · verified by content signature</small></label>
-        <div className="dialog-actions"><button className="button button--ghost" onClick={onClose} type="button">Cancel</button><button className="button button--primary" disabled={busy} type="submit">{busy ? "Securing upload…" : "Create and upload"}</button></div>
+        {busy ? <div className="operation-transmission" role="status"><span /><p><strong>{status}</strong><small>Do not close this secure channel.</small></p></div> : null}
+        <div className="dialog-actions"><button className="button button--ghost" disabled={busy} onClick={onClose} type="button">Cancel</button><CyberActionButton idleLabel="Create and secure document" pending={busy} stages={uploadStages} statusLabel={status} type="submit" /></div>
       </form>
     </DialogFrame>
   );
@@ -311,10 +390,11 @@ function CategoryDialog({ categories, onClose, onChanged, show }: {
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
+    setBusyId("create");
     try {
       await apiJson("/api/categories", { method: "POST", body: JSON.stringify({ name }) });
       setName(""); onChanged(); show("success", "Category created.");
-    } catch (error) { show("error", readableError(error)); }
+    } catch (error) { show("error", readableError(error)); } finally { setBusyId(null); }
   }
 
   async function rename(category: Category) {
@@ -338,10 +418,10 @@ function CategoryDialog({ categories, onClose, onChanged, show }: {
 
   return (
     <DialogFrame onClose={onClose} subtitle="Personal organization" title="Manage categories">
-      <form className="category-create" onSubmit={create}><input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="New category name" required value={name} /><button className="button button--primary" type="submit">Add</button></form>
+      <form className="category-create" onSubmit={create}><input disabled={Boolean(busyId)} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="New category name" required value={name} /><CyberActionButton disabled={Boolean(busyId) && busyId !== "create"} idleLabel="Add category" pending={busyId === "create"} stages={["Checking category name", "Creating private category", "Refreshing workspace"]} type="submit" /></form>
       <div className="category-list">
         {categories.length ? categories.map((category) => (
-          <div key={category.id}><span><strong>{category.name}</strong><small>{category.activeDocumentCount} active document{category.activeDocumentCount === 1 ? "" : "s"}</small></span><span><button disabled={busyId === category.id} onClick={() => void rename(category)} type="button">Rename</button><button className="danger-link" disabled={busyId === category.id} onClick={() => void remove(category)} type="button">Delete</button></span></div>
+          <div key={category.id}><span><strong>{category.name}</strong><small>{category.activeDocumentCount} active document{category.activeDocumentCount === 1 ? "" : "s"}</small></span><span><button disabled={Boolean(busyId)} onClick={() => void rename(category)} type="button">{busyId === category.id ? "Processing…" : "Rename"}</button><button className="danger-link" disabled={Boolean(busyId)} onClick={() => void remove(category)} type="button">{busyId === category.id ? "Securing…" : "Delete"}</button></span></div>
         )) : <p className="inline-empty">No categories yet.</p>}
       </div>
     </DialogFrame>
@@ -361,34 +441,90 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [grants, setGrants] = useState<DocumentGrant[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedSections, setLoadedSections] = useState<Set<DetailSection>>(
+    () => new Set(["overview"]),
+  );
+  const [loadingSection, setLoadingSection] = useState<DetailSection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"metadata" | "version" | "content" | "remove" | null>(null);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [metadata, versionResult] = await Promise.all([
-        apiJson<{ data: { document: VaultDocument } }>(`/api/documents/${initial.id}`),
-        apiJson<{ data: { versions: DocumentVersion[] } }>(`/api/documents/${initial.id}/versions`),
-      ]);
-      setDocument(metadata.data.document);
-      setVersions(versionResult.data.versions);
-      if (metadata.data.document.access === "OWNER") {
-        const [grantResult, activityResult] = await Promise.all([
-          apiJson<{ data: { grants: DocumentGrant[] } }>(`/api/documents/${initial.id}/grants`),
-          apiJson<{ data: { events: AuditEvent[] } }>(`/api/documents/${initial.id}/activity?limit=30`),
-        ]);
-        setGrants(grantResult.data.grants);
-        setEvents(activityResult.data.events);
-      }
-    } catch (caught) { setError(readableError(caught)); } finally { setLoading(false); }
-  }, [initial.id]);
+  const markSectionLoaded = useCallback((loadedSection: DetailSection) => {
+    setLoadedSections((current) => new Set(current).add(loadedSection));
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const loadVersions = useCallback(async () => {
+    setLoadingSection("versions"); setError("");
+    try {
+      const versionResult = await apiJson<{ data: { versions: DocumentVersion[] } }>(
+        `/api/documents/${document.id}/versions`,
+      );
+      setVersions(versionResult.data.versions);
+      markSectionLoaded("versions");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "versions" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  const loadGrants = useCallback(async () => {
+    setLoadingSection("sharing"); setError("");
+    try {
+      const grantResult = await apiJson<{ data: { grants: DocumentGrant[] } }>(
+        `/api/documents/${document.id}/grants`,
+      );
+      setGrants(grantResult.data.grants);
+      markSectionLoaded("sharing");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "sharing" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  const loadActivity = useCallback(async () => {
+    setLoadingSection("activity"); setError("");
+    try {
+      const activityResult = await apiJson<{ data: { events: AuditEvent[] } }>(
+        `/api/documents/${document.id}/activity?limit=30`,
+      );
+      setEvents(activityResult.data.events);
+      markSectionLoaded("activity");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "activity" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  useEffect(() => {
+    if (loadedSections.has(section)) return;
+    if (section === "versions") void loadVersions();
+    if (section === "sharing") void loadGrants();
+    if (section === "activity") void loadActivity();
+  }, [loadActivity, loadGrants, loadedSections, loadVersions, section]);
+
+  function invalidateActivity() {
+    setLoadedSections((current) => {
+      const next = new Set(current);
+      next.delete("activity");
+      return next;
+    });
+  }
+
+  function applyGrantChange(nextGrant: DocumentGrant) {
+    setGrants((current) => {
+      if (nextGrant.status === "REVOKED") {
+        return current.map((grant) => grant.id === nextGrant.id ? nextGrant : grant);
+      }
+      return [
+        nextGrant,
+        ...current.filter((grant) =>
+          grant.id !== nextGrant.id &&
+          !(grant.status === "ACTIVE" && grant.recipient.id === nextGrant.recipient.id),
+        ),
+      ];
+    });
+    invalidateActivity();
+  }
 
   async function update(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setBusy(true); setOperation("metadata"); setError("");
     const form = new FormData(event.currentTarget);
     try {
       const result = await apiJson<{ data: { document: VaultDocument } }>(`/api/documents/${document.id}`, {
@@ -396,21 +532,29 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
         body: JSON.stringify({ name: String(form.get("name")), description: String(form.get("description") ?? "").trim() || null, ...(document.access === "OWNER" ? { categoryId: String(form.get("categoryId") ?? "") || null } : {}) }),
       });
       setDocument(result.data.document); onChanged(result.data.document, "Document details updated.");
-    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); }
+    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); setOperation(null); }
   }
 
   async function uploadVersion(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setBusy(true); setOperation("version"); setError("");
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     try {
-      await apiJson(`/api/documents/${document.id}/versions`, { method: "POST", body: form });
-      formElement.reset(); await load(); show("success", "A new immutable version was uploaded.");
-    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); }
+      const result = await apiJson<{ data: { version: DocumentVersion } }>(
+        `/api/documents/${document.id}/versions`,
+        { method: "POST", body: form },
+      );
+      setVersions((current) => [
+        result.data.version,
+        ...current.filter((version) => version.id !== result.data.version.id),
+      ]);
+      formElement.reset(); invalidateActivity();
+      show("success", "A new immutable version was uploaded.");
+    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); setOperation(null); }
   }
 
   async function openContent(version: DocumentVersion, download: boolean) {
-    setBusy(true); setError("");
+    setBusy(true); setOperation("content"); setError("");
     try {
       const path = `/api/documents/${document.id}/versions/${version.id}/content${download ? "?disposition=attachment" : ""}`;
       const content = await fetchPrivateContent(path);
@@ -421,18 +565,18 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
       else { link.target = "_blank"; link.rel = "noopener"; }
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); }
+    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); setOperation(null); }
   }
 
   async function removeOrRestore() {
     const restoring = document.state === "DELETED";
     if (!restoring && !window.confirm(`Move “${document.name}” to trash? Existing shares stop immediately.`)) return;
-    setBusy(true);
+    setBusy(true); setOperation("remove");
     try {
       const result = await apiJson<{ data: { document: VaultDocument } }>(`/api/documents/${document.id}${restoring ? "/restore" : ""}`, { method: restoring ? "POST" : "DELETE" });
       onRemoved(restoring ? "Document restored." : "Document moved to trash and shared access was suspended.");
       setDocument(result.data.document);
-    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); }
+    } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); setOperation(null); }
   }
 
   return (
@@ -441,30 +585,38 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
         {(["overview", "versions", ...(document.access === "OWNER" ? ["sharing", "activity"] : [])] as DetailSection[]).map((tab) => <button className={section === tab ? "is-active" : ""} key={tab} onClick={() => setSection(tab)} role="tab" type="button">{tab}</button>)}
       </div>
       {error ? <p className="form-error detail-error" role="alert">{error}</p> : null}
-      {loading ? <div className="detail-loading">Loading authorized document details…</div> : null}
-      {!loading && section === "overview" ? (
+      {loadingSection === section ? <div className="detail-loading">Loading authorized document details…</div> : null}
+      {section === "overview" ? (
         <form className="dialog-form detail-overview" onSubmit={update}>
           <div className="detail-facts"><div><span>Owner</span><strong>{document.owner.name}</strong><small>{document.owner.email}</small></div><div><span>Created</span><strong>{formatDate(document.createdAt)}</strong></div><div><span>Status</span><strong>{document.state}</strong></div></div>
-          {document.access === "OWNER" || document.access === "EDIT" ? <><label>Document name<input defaultValue={document.name} maxLength={255} name="name" required /></label><label>Description<textarea defaultValue={document.description ?? ""} maxLength={1000} name="description" rows={3} /></label>{document.access === "OWNER" ? <label>Category<select defaultValue={document.category?.id ?? ""} name="categoryId"><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}<div className="dialog-actions"><button className="button button--primary" disabled={busy || document.state === "DELETED"} type="submit">Save changes</button>{document.access === "OWNER" ? <button className={`button ${document.state === "DELETED" ? "button--primary" : "button--danger"}`} disabled={busy} onClick={() => void removeOrRestore()} type="button">{document.state === "DELETED" ? "Restore document" : "Move to trash"}</button> : null}</div></> : <p className="read-only-note">You have read-only access. Metadata changes and sharing controls are intentionally unavailable.</p>}
+          {document.access === "OWNER" || document.access === "EDIT" ? <>
+            <label>Document name<input defaultValue={document.name} maxLength={255} name="name" required /></label>
+            <label>Description<textarea defaultValue={document.description ?? ""} maxLength={1000} name="description" rows={3} /></label>
+            {document.access === "OWNER" ? <label>Category<select defaultValue={document.category?.id ?? ""} name="categoryId"><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}
+            <div className="dialog-actions">
+              <CyberActionButton disabled={busy || document.state === "DELETED"} idleLabel="Save protected metadata" pending={operation === "metadata"} stages={metadataStages} type="submit" />
+              {document.access === "OWNER" ? <CyberActionButton disabled={busy} idleLabel={document.state === "DELETED" ? "Restore document" : "Move to trash"} onClick={() => void removeOrRestore()} pending={operation === "remove"} stages={document.state === "DELETED" ? ["Checking owner clearance", "Restoring document", "Recording audit event"] : ["Checking owner clearance", "Suspending shared access", "Moving document to trash"]} type="button" variant={document.state === "DELETED" ? "primary" : "danger"} /> : null}
+            </div>
+          </> : <p className="read-only-note">You have view clearance only. Metadata changes and sharing controls remain outside this grant.</p>}
         </form>
       ) : null}
-      {!loading && section === "versions" ? <VersionsPanel busy={busy} canUpload={(document.access === "OWNER" || document.access === "EDIT") && document.state === "ACTIVE"} onOpen={openContent} onUpload={uploadVersion} versions={versions} /> : null}
-      {!loading && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={load} show={show} /> : null}
-      {!loading && section === "activity" ? <ActivityList events={events} /> : null}
+      {loadedSections.has("versions") && section === "versions" ? <VersionsPanel busy={busy} canUpload={(document.access === "OWNER" || document.access === "EDIT") && document.state === "ACTIVE"} onOpen={openContent} onUpload={uploadVersion} uploading={operation === "version"} versions={versions} /> : null}
+      {loadedSections.has("sharing") && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={applyGrantChange} show={show} /> : null}
+      {loadedSections.has("activity") && section === "activity" ? <ActivityList events={events} /> : null}
     </DialogFrame>
   );
 }
 
-function VersionsPanel({ versions, canUpload, busy, onUpload, onOpen }: { versions: DocumentVersion[]; canUpload: boolean; busy: boolean; onUpload: (event: React.FormEvent<HTMLFormElement>) => void; onOpen: (version: DocumentVersion, download: boolean) => void }) {
-  return <div className="detail-section">{canUpload ? <form className="version-upload" onSubmit={onUpload}><label>Upload new version<input accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" name="file" required type="file" /></label><button className="button button--primary" disabled={busy} type="submit">Upload version</button></form> : null}<div className="version-list">{versions.length ? versions.map((version) => <article key={version.id}><span className="version-number">v{version.versionNumber}</span><div><strong>{version.originalFilename}</strong><small>{formatBytes(version.sizeBytes)} · {formatDate(version.createdAt)} · by {version.createdBy.name}</small></div><span className="row-actions"><button disabled={busy} onClick={() => void onOpen(version, false)} type="button">Preview</button><button disabled={busy} onClick={() => void onOpen(version, true)} type="button">Download</button></span></article>) : <p className="inline-empty">No ready versions yet.</p>}</div></div>;
+function VersionsPanel({ versions, canUpload, busy, uploading, onUpload, onOpen }: { versions: DocumentVersion[]; canUpload: boolean; busy: boolean; uploading: boolean; onUpload: (event: React.FormEvent<HTMLFormElement>) => void; onOpen: (version: DocumentVersion, download: boolean) => void }) {
+  return <div className="detail-section">{canUpload ? <form className="version-upload" onSubmit={onUpload}><label>Upload new version<input accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" disabled={busy} name="file" required type="file" /></label><CyberActionButton disabled={busy && !uploading} idleLabel="Upload immutable version" pending={uploading} stages={versionStages} type="submit" /></form> : null}<div className="version-list">{versions.length ? versions.map((version) => <article key={version.id}><span className="version-number">v{version.versionNumber}</span><div><strong>{version.originalFilename}</strong><small>{formatBytes(version.sizeBytes)} · {formatDate(version.createdAt)} · by {version.createdBy.name}</small></div><span className="row-actions"><button disabled={busy} onClick={() => void onOpen(version, false)} type="button">Preview</button><button disabled={busy} onClick={() => void onOpen(version, true)} type="button">Download</button></span></article>) : <p className="inline-empty">No ready versions yet.</p>}</div></div>;
 }
 
-function SharingPanel({ documentId, grants, onChanged, show }: { documentId: string; grants: DocumentGrant[]; onChanged: () => Promise<void>; show: (kind: "success" | "error", text: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); const formElement = event.currentTarget; const form = new FormData(formElement); try { await apiJson(`/api/documents/${documentId}/grants`, { method: "POST", body: JSON.stringify({ recipientEmail: String(form.get("email")), accessLevel: String(form.get("accessLevel")) }) }); formElement.reset(); await onChanged(); show("success", "Access granted."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
-  async function change(item: DocumentGrant, method: "PATCH" | "DELETE", accessLevel?: "READ" | "EDIT") { setBusy(true); try { await apiJson(`/api/documents/${documentId}/grants/${item.id}`, { method, ...(accessLevel ? { body: JSON.stringify({ accessLevel }) } : {}) }); await onChanged(); show("success", method === "DELETE" ? "Access revoked immediately." : "Access level updated."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
+function SharingPanel({ documentId, grants, onChanged, show }: { documentId: string; grants: DocumentGrant[]; onChanged: (grant: DocumentGrant) => void; show: (kind: "success" | "error", text: string) => void }) {
+  const [busyAction, setBusyAction] = useState<{ kind: "grant" | "update" | "revoke"; grantId?: string } | null>(null);
+  async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusyAction({ kind: "grant" }); const formElement = event.currentTarget; const form = new FormData(formElement); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants`, { method: "POST", body: JSON.stringify({ recipientEmail: String(form.get("email")), accessLevel: String(form.get("accessLevel")) }) }); formElement.reset(); onChanged(result.data.grant); show("success", "Access granted and recorded."); } catch (error) { show("error", readableError(error)); } finally { setBusyAction(null); } }
+  async function change(item: DocumentGrant, method: "PATCH" | "DELETE", accessLevel?: "READ" | "EDIT") { setBusyAction({ kind: method === "DELETE" ? "revoke" : "update", grantId: item.id }); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants/${item.id}`, { method, ...(accessLevel ? { body: JSON.stringify({ accessLevel }) } : {}) }); onChanged(result.data.grant); show("success", method === "DELETE" ? "Access revoked immediately and recorded." : "Access clearance updated."); } catch (error) { show("error", readableError(error)); } finally { setBusyAction(null); } }
   const active = grants.filter((grant) => grant.status === "ACTIVE");
-  return <div className="detail-section"><form className="share-form" onSubmit={grant}><label>Recipient email<input name="email" placeholder="colleague@company.com" required type="email" /></label><label>Access<select defaultValue="READ" name="accessLevel"><option value="READ">Can view</option><option value="EDIT">Can edit</option></select></label><button className="button button--primary" disabled={busy} type="submit">Grant access</button></form><p className="security-inline">Recipients must already have an active TrustVault account. Revocation applies to their next request.</p><div className="grant-list">{active.length ? active.map((item) => <article key={item.id}><span className="avatar" aria-hidden="true">{item.recipient.name.slice(0, 2).toUpperCase()}</span><div><strong>{item.recipient.name}</strong><small>{item.recipient.email}</small></div><select aria-label={`Access for ${item.recipient.name}`} disabled={busy} onChange={(event) => void change(item, "PATCH", event.target.value as "READ" | "EDIT")} value={item.accessLevel}><option value="READ">View</option><option value="EDIT">Edit</option></select><button className="danger-link" disabled={busy} onClick={() => void change(item, "DELETE")} type="button">Revoke</button></article>) : <p className="inline-empty">This document is not shared with anyone.</p>}</div></div>;
+  return <div className="detail-section"><form className="share-form" onSubmit={grant}><label>Recipient email<input disabled={Boolean(busyAction)} name="email" placeholder="colleague@company.com" required type="email" /></label><label>Access<select defaultValue="READ" disabled={Boolean(busyAction)} name="accessLevel"><option value="READ">Can view</option><option value="EDIT">Can edit</option></select></label><CyberActionButton disabled={Boolean(busyAction) && busyAction?.kind !== "grant"} idleLabel="Grant clearance" pending={busyAction?.kind === "grant"} stages={grantStages} type="submit" /></form><p className="security-inline">Recipients must already have an active TrustVault identity. Revocation is enforced on their next request.</p>{busyAction && busyAction.kind !== "grant" ? <div className="operation-transmission operation-transmission--compact" role="status"><span /><p><strong>{busyAction.kind === "revoke" ? revokeStages[1] : "Updating permission boundary"}</strong><small>The server is recording this authorization change.</small></p></div> : null}<div className="grant-list">{active.length ? active.map((item) => <article key={item.id}><span className="avatar" aria-hidden="true">{item.recipient.name.slice(0, 2).toUpperCase()}</span><div><strong>{item.recipient.name}</strong><small>{item.recipient.email}</small></div><select aria-label={`Access for ${item.recipient.name}`} disabled={Boolean(busyAction)} onChange={(event) => void change(item, "PATCH", event.target.value as "READ" | "EDIT")} value={item.accessLevel}><option value="READ">View</option><option value="EDIT">Edit</option></select><button className="danger-link" disabled={Boolean(busyAction)} onClick={() => void change(item, "DELETE")} type="button">{busyAction?.kind === "revoke" && busyAction.grantId === item.id ? "Revoking…" : "Revoke"}</button></article>) : <p className="inline-empty">This document is not shared with anyone.</p>}</div></div>;
 }
 
 export function ActivityList({ events }: { events: AuditEvent[] }) {
