@@ -17,8 +17,12 @@ version is deliberately pinned to the stable Prisma 7 line instead of the Prisma
 
 Two Supabase connection strings have different jobs:
 
-- `DATABASE_URL` is the pooled runtime connection used by the Render application.
-- `DIRECT_URL` is the direct connection used only by Prisma migration commands.
+- `DATABASE_URL` uses the shared session pooler on port `5432` for the persistent
+  Render application. A direct project URL is also suitable when the runtime can
+  reach Supabase over IPv6.
+- `DIRECT_URL` is the direct connection used by Prisma migration commands. The
+  session pooler is the IPv4-compatible fallback when the direct endpoint is not
+  reachable.
 
 `prisma.config.ts` prefers `DIRECT_URL` for CLI operations. The runtime database
 factory reads only `DATABASE_URL`, fails closed when it is missing in production,

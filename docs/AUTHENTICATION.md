@@ -81,7 +81,8 @@ a multi-instance deployment would require shared rate-limit storage.
 
 Required at runtime:
 
-- `DATABASE_URL`: pooled PostgreSQL runtime connection;
+- `DATABASE_URL`: persistent PostgreSQL runtime connection, normally the
+  Supabase session pooler on port `5432`;
 - `APP_URL`: exact public application origin, for example
   `https://vault.example.com`;
 - `BETTER_AUTH_SECRET`: at least 32 random characters, generated independently
