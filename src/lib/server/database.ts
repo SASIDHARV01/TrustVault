@@ -9,6 +9,11 @@ const globalDatabase = globalThis as unknown as {
   trustVaultPrisma?: PrismaClient;
 };
 
+export const DATABASE_TRANSACTION_OPTIONS = {
+  maxWait: 15_000,
+  timeout: 30_000,
+} as const;
+
 function createDatabaseClient() {
   const adapter = new PrismaPg({
     connectionString: getRuntimeDatabaseUrl(),
@@ -17,7 +22,10 @@ function createDatabaseClient() {
     max: 10,
   });
 
-  return new PrismaClient({ adapter });
+  return new PrismaClient({
+    adapter,
+    transactionOptions: DATABASE_TRANSACTION_OPTIONS,
+  });
 }
 
 // Lazy creation keeps static builds independent from database availability.

@@ -1,7 +1,19 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { runSerializableTransaction } from "@/lib/server/database";
+import {
+  DATABASE_TRANSACTION_OPTIONS,
+  runSerializableTransaction,
+} from "@/lib/server/database";
+
+describe("database transaction configuration", () => {
+  it("allows bounded time for a cold managed PostgreSQL connection", () => {
+    expect(DATABASE_TRANSACTION_OPTIONS).toEqual({
+      maxWait: 15_000,
+      timeout: 30_000,
+    });
+  });
+});
 
 describe("runSerializableTransaction", () => {
   it("retries PostgreSQL write conflicts and preserves serializable isolation", async () => {

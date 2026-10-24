@@ -98,7 +98,7 @@ These exclusions keep the authorization model small enough to reason about and t
 
 ## Local development
 
-Use Node.js 20.9 or newer. Copy `.env.example` to an ignored `.env.local`, replace
+Use Node.js 20.9 or newer. Copy `.env.example` to an ignored `.env`, replace
 its placeholders, and apply the database migration before using authentication.
 
 ```bash
