@@ -14,6 +14,10 @@ export const DATABASE_TRANSACTION_OPTIONS = {
   timeout: 30_000,
 } as const;
 
+export const SERIALIZABLE_MAX_ATTEMPTS = 16;
+const SERIALIZABLE_RETRY_BASE_MS = 4;
+const SERIALIZABLE_RETRY_CAP_MS = 250;
+
 function createDatabaseClient() {
   const adapter = new PrismaPg({
     connectionString: getRuntimeDatabaseUrl(),
@@ -75,18 +79,35 @@ function isSerializableConflict(error: unknown) {
   );
 }
 
+function serializableRetryDelayMs(attempt: number) {
+  const ceiling = Math.min(
+    SERIALIZABLE_RETRY_BASE_MS * 2 ** attempt,
+    SERIALIZABLE_RETRY_CAP_MS,
+  );
+
+  // Jitter prevents concurrent requests from repeatedly colliding in lockstep.
+  return Math.floor(ceiling / 2 + Math.random() * (ceiling / 2));
+}
+
 export async function runSerializableTransaction<T>(
   database: PrismaClient,
   operation: (transaction: Prisma.TransactionClient) => Promise<T>,
 ) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < SERIALIZABLE_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await database.$transaction(operation, {
         isolationLevel: "Serializable",
       });
     } catch (error) {
-      if (!isSerializableConflict(error) || attempt === 7) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 2 ** attempt));
+      if (
+        !isSerializableConflict(error) ||
+        attempt === SERIALIZABLE_MAX_ATTEMPTS - 1
+      ) {
+        throw error;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, serializableRetryDelayMs(attempt)),
+      );
     }
   }
 
