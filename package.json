@@ -23,6 +23,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
+    "predb:seed:demo": "prisma generate",
     "db:seed:demo": "tsx scripts/seed-demo-users.ts",
     "check": "npm run db:validate && npm run lint && npm run typecheck && npm run test && npm run build"
   },

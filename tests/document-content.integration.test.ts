@@ -12,11 +12,12 @@ import {
   listDocumentVersions,
 } from "../src/lib/server/document-content-service";
 import { InMemoryObjectStorage } from "../src/lib/testing/in-memory-object-storage";
+import { getAuditTestKey } from "./audit-test-key";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl ? describe : describe.skip;
 const suffix = `${process.pid}-${Date.now()}`;
-const encodedKey = Buffer.alloc(32, 21).toString("base64");
+const encodedKey = getAuditTestKey();
 const auditContext = {
   requestId: `content-${suffix}`,
   ipAddress: "127.0.0.1",
