@@ -41,7 +41,6 @@ export function LoginForm({ callbackPath }: { callbackPath: string }) {
     }
 
     router.replace(callbackPath);
-    router.refresh();
   }
 
   return (

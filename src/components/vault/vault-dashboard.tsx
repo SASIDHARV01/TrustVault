@@ -34,6 +34,20 @@ function useNotice() {
   return { notice, show };
 }
 
+function useDebouncedValue<T>(value: T, delayMilliseconds = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedValue(value),
+      delayMilliseconds,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMilliseconds, value]);
+
+  return debouncedValue;
+}
+
 export function VaultDashboard({ userId }: { userId: string }) {
   const [documents, setDocuments] = useState<VaultDocument[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -52,6 +66,9 @@ export function VaultDashboard({ userId }: { userId: string }) {
   const [showCategories, setShowCategories] = useState(false);
   const [selected, setSelected] = useState<VaultDocument | null>(null);
   const { notice, show } = useNotice();
+  const debouncedQuery = useDebouncedValue(query);
+  const debouncedCategoryName = useDebouncedValue(categoryName);
+  const debouncedOwner = useDebouncedValue(owner);
 
   const loadCategories = useCallback(async () => {
     const result = await apiJson<{ data: { categories: Category[] } }>("/api/categories");
@@ -63,10 +80,10 @@ export function VaultDashboard({ userId }: { userId: string }) {
     try {
       const result = await apiJson<DocumentListResponse>(
         `/api/documents${queryString({
-          q: query,
+          q: debouncedQuery,
           categoryId,
-          category: categoryName,
-          owner,
+          category: debouncedCategoryName,
+          owner: debouncedOwner,
           createdFrom: dateBoundary(createdFrom, false),
           createdTo: dateBoundary(createdTo, true),
           state,
@@ -83,7 +100,7 @@ export function VaultDashboard({ userId }: { userId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [categoryId, categoryName, createdFrom, createdTo, owner, page, query, show, sort, state]);
+  }, [categoryId, createdFrom, createdTo, debouncedCategoryName, debouncedOwner, debouncedQuery, page, show, sort, state]);
 
   useEffect(() => {
     void loadDocuments();
@@ -197,8 +214,17 @@ export function VaultDashboard({ userId }: { userId: string }) {
       {showUpload ? (
         <UploadDialog
           categories={categories}
-          onClose={() => { setShowUpload(false); refresh(); }}
-          onCreated={(message) => { setShowUpload(false); show("success", message); refresh(); }}
+          onClose={() => setShowUpload(false)}
+          onCreated={(document, message) => {
+            setShowUpload(false);
+            setCategories((current) => current.map((category) =>
+              category.id === document.category?.id
+                ? { ...category, activeDocumentCount: category.activeDocumentCount + 1 }
+                : category,
+            ));
+            show("success", message);
+            void loadDocuments();
+          }}
         />
       ) : null}
       {showCategories ? (
@@ -216,8 +242,11 @@ export function VaultDashboard({ userId }: { userId: string }) {
           onClose={() => setSelected(null)}
           onChanged={(updated, message) => {
             setSelected(updated);
+            setDocuments((current) => current.map((document) =>
+              document.id === updated.id ? updated : document,
+            ));
             show("success", message);
-            refresh();
+            void loadDocuments();
           }}
           onRemoved={(message) => { setSelected(null); show("success", message); refresh(); }}
           show={show}
@@ -252,7 +281,7 @@ function DialogFrame({ title, subtitle, onClose, children, wide = false }: {
 function UploadDialog({ categories, onClose, onCreated }: {
   categories: Category[];
   onClose: () => void;
-  onCreated: (message: string) => void;
+  onCreated: (document: VaultDocument, message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -278,7 +307,10 @@ function UploadDialog({ categories, onClose, onCreated }: {
       const upload = new FormData();
       upload.set("file", file);
       await apiJson(`/api/documents/${documentId}/versions`, { method: "POST", body: upload });
-      onCreated("Document and its first immutable version were uploaded.");
+      onCreated(
+        created.data.document,
+        "Document and its first immutable version were uploaded.",
+      );
     } catch (caught) {
       setError(documentId ? `The document record was created, but the file upload failed. Open it and retry. ${readableError(caught)}` : readableError(caught));
     } finally {
@@ -361,31 +393,86 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [grants, setGrants] = useState<DocumentGrant[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedSections, setLoadedSections] = useState<Set<DetailSection>>(
+    () => new Set(["overview"]),
+  );
+  const [loadingSection, setLoadingSection] = useState<DetailSection | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [metadata, versionResult] = await Promise.all([
-        apiJson<{ data: { document: VaultDocument } }>(`/api/documents/${initial.id}`),
-        apiJson<{ data: { versions: DocumentVersion[] } }>(`/api/documents/${initial.id}/versions`),
-      ]);
-      setDocument(metadata.data.document);
-      setVersions(versionResult.data.versions);
-      if (metadata.data.document.access === "OWNER") {
-        const [grantResult, activityResult] = await Promise.all([
-          apiJson<{ data: { grants: DocumentGrant[] } }>(`/api/documents/${initial.id}/grants`),
-          apiJson<{ data: { events: AuditEvent[] } }>(`/api/documents/${initial.id}/activity?limit=30`),
-        ]);
-        setGrants(grantResult.data.grants);
-        setEvents(activityResult.data.events);
-      }
-    } catch (caught) { setError(readableError(caught)); } finally { setLoading(false); }
-  }, [initial.id]);
+  const markSectionLoaded = useCallback((loadedSection: DetailSection) => {
+    setLoadedSections((current) => new Set(current).add(loadedSection));
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const loadVersions = useCallback(async () => {
+    setLoadingSection("versions"); setError("");
+    try {
+      const versionResult = await apiJson<{ data: { versions: DocumentVersion[] } }>(
+        `/api/documents/${document.id}/versions`,
+      );
+      setVersions(versionResult.data.versions);
+      markSectionLoaded("versions");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "versions" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  const loadGrants = useCallback(async () => {
+    setLoadingSection("sharing"); setError("");
+    try {
+      const grantResult = await apiJson<{ data: { grants: DocumentGrant[] } }>(
+        `/api/documents/${document.id}/grants`,
+      );
+      setGrants(grantResult.data.grants);
+      markSectionLoaded("sharing");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "sharing" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  const loadActivity = useCallback(async () => {
+    setLoadingSection("activity"); setError("");
+    try {
+      const activityResult = await apiJson<{ data: { events: AuditEvent[] } }>(
+        `/api/documents/${document.id}/activity?limit=30`,
+      );
+      setEvents(activityResult.data.events);
+      markSectionLoaded("activity");
+    } catch (caught) { setError(readableError(caught)); } finally {
+      setLoadingSection((current) => current === "activity" ? null : current);
+    }
+  }, [document.id, markSectionLoaded]);
+
+  useEffect(() => {
+    if (loadedSections.has(section)) return;
+    if (section === "versions") void loadVersions();
+    if (section === "sharing") void loadGrants();
+    if (section === "activity") void loadActivity();
+  }, [loadActivity, loadGrants, loadedSections, loadVersions, section]);
+
+  function invalidateActivity() {
+    setLoadedSections((current) => {
+      const next = new Set(current);
+      next.delete("activity");
+      return next;
+    });
+  }
+
+  function applyGrantChange(nextGrant: DocumentGrant) {
+    setGrants((current) => {
+      if (nextGrant.status === "REVOKED") {
+        return current.map((grant) => grant.id === nextGrant.id ? nextGrant : grant);
+      }
+      return [
+        nextGrant,
+        ...current.filter((grant) =>
+          grant.id !== nextGrant.id &&
+          !(grant.status === "ACTIVE" && grant.recipient.id === nextGrant.recipient.id),
+        ),
+      ];
+    });
+    invalidateActivity();
+  }
 
   async function update(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
@@ -404,8 +491,16 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     try {
-      await apiJson(`/api/documents/${document.id}/versions`, { method: "POST", body: form });
-      formElement.reset(); await load(); show("success", "A new immutable version was uploaded.");
+      const result = await apiJson<{ data: { version: DocumentVersion } }>(
+        `/api/documents/${document.id}/versions`,
+        { method: "POST", body: form },
+      );
+      setVersions((current) => [
+        result.data.version,
+        ...current.filter((version) => version.id !== result.data.version.id),
+      ]);
+      formElement.reset(); invalidateActivity();
+      show("success", "A new immutable version was uploaded.");
     } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); }
   }
 
@@ -441,16 +536,16 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
         {(["overview", "versions", ...(document.access === "OWNER" ? ["sharing", "activity"] : [])] as DetailSection[]).map((tab) => <button className={section === tab ? "is-active" : ""} key={tab} onClick={() => setSection(tab)} role="tab" type="button">{tab}</button>)}
       </div>
       {error ? <p className="form-error detail-error" role="alert">{error}</p> : null}
-      {loading ? <div className="detail-loading">Loading authorized document details…</div> : null}
-      {!loading && section === "overview" ? (
+      {loadingSection === section ? <div className="detail-loading">Loading authorized document details…</div> : null}
+      {section === "overview" ? (
         <form className="dialog-form detail-overview" onSubmit={update}>
           <div className="detail-facts"><div><span>Owner</span><strong>{document.owner.name}</strong><small>{document.owner.email}</small></div><div><span>Created</span><strong>{formatDate(document.createdAt)}</strong></div><div><span>Status</span><strong>{document.state}</strong></div></div>
           {document.access === "OWNER" || document.access === "EDIT" ? <><label>Document name<input defaultValue={document.name} maxLength={255} name="name" required /></label><label>Description<textarea defaultValue={document.description ?? ""} maxLength={1000} name="description" rows={3} /></label>{document.access === "OWNER" ? <label>Category<select defaultValue={document.category?.id ?? ""} name="categoryId"><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}<div className="dialog-actions"><button className="button button--primary" disabled={busy || document.state === "DELETED"} type="submit">Save changes</button>{document.access === "OWNER" ? <button className={`button ${document.state === "DELETED" ? "button--primary" : "button--danger"}`} disabled={busy} onClick={() => void removeOrRestore()} type="button">{document.state === "DELETED" ? "Restore document" : "Move to trash"}</button> : null}</div></> : <p className="read-only-note">You have read-only access. Metadata changes and sharing controls are intentionally unavailable.</p>}
         </form>
       ) : null}
-      {!loading && section === "versions" ? <VersionsPanel busy={busy} canUpload={(document.access === "OWNER" || document.access === "EDIT") && document.state === "ACTIVE"} onOpen={openContent} onUpload={uploadVersion} versions={versions} /> : null}
-      {!loading && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={load} show={show} /> : null}
-      {!loading && section === "activity" ? <ActivityList events={events} /> : null}
+      {loadedSections.has("versions") && section === "versions" ? <VersionsPanel busy={busy} canUpload={(document.access === "OWNER" || document.access === "EDIT") && document.state === "ACTIVE"} onOpen={openContent} onUpload={uploadVersion} versions={versions} /> : null}
+      {loadedSections.has("sharing") && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={applyGrantChange} show={show} /> : null}
+      {loadedSections.has("activity") && section === "activity" ? <ActivityList events={events} /> : null}
     </DialogFrame>
   );
 }
@@ -459,10 +554,10 @@ function VersionsPanel({ versions, canUpload, busy, onUpload, onOpen }: { versio
   return <div className="detail-section">{canUpload ? <form className="version-upload" onSubmit={onUpload}><label>Upload new version<input accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" name="file" required type="file" /></label><button className="button button--primary" disabled={busy} type="submit">Upload version</button></form> : null}<div className="version-list">{versions.length ? versions.map((version) => <article key={version.id}><span className="version-number">v{version.versionNumber}</span><div><strong>{version.originalFilename}</strong><small>{formatBytes(version.sizeBytes)} · {formatDate(version.createdAt)} · by {version.createdBy.name}</small></div><span className="row-actions"><button disabled={busy} onClick={() => void onOpen(version, false)} type="button">Preview</button><button disabled={busy} onClick={() => void onOpen(version, true)} type="button">Download</button></span></article>) : <p className="inline-empty">No ready versions yet.</p>}</div></div>;
 }
 
-function SharingPanel({ documentId, grants, onChanged, show }: { documentId: string; grants: DocumentGrant[]; onChanged: () => Promise<void>; show: (kind: "success" | "error", text: string) => void }) {
+function SharingPanel({ documentId, grants, onChanged, show }: { documentId: string; grants: DocumentGrant[]; onChanged: (grant: DocumentGrant) => void; show: (kind: "success" | "error", text: string) => void }) {
   const [busy, setBusy] = useState(false);
-  async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); const formElement = event.currentTarget; const form = new FormData(formElement); try { await apiJson(`/api/documents/${documentId}/grants`, { method: "POST", body: JSON.stringify({ recipientEmail: String(form.get("email")), accessLevel: String(form.get("accessLevel")) }) }); formElement.reset(); await onChanged(); show("success", "Access granted."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
-  async function change(item: DocumentGrant, method: "PATCH" | "DELETE", accessLevel?: "READ" | "EDIT") { setBusy(true); try { await apiJson(`/api/documents/${documentId}/grants/${item.id}`, { method, ...(accessLevel ? { body: JSON.stringify({ accessLevel }) } : {}) }); await onChanged(); show("success", method === "DELETE" ? "Access revoked immediately." : "Access level updated."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
+  async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); const formElement = event.currentTarget; const form = new FormData(formElement); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants`, { method: "POST", body: JSON.stringify({ recipientEmail: String(form.get("email")), accessLevel: String(form.get("accessLevel")) }) }); formElement.reset(); onChanged(result.data.grant); show("success", "Access granted."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
+  async function change(item: DocumentGrant, method: "PATCH" | "DELETE", accessLevel?: "READ" | "EDIT") { setBusy(true); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants/${item.id}`, { method, ...(accessLevel ? { body: JSON.stringify({ accessLevel }) } : {}) }); onChanged(result.data.grant); show("success", method === "DELETE" ? "Access revoked immediately." : "Access level updated."); } catch (error) { show("error", readableError(error)); } finally { setBusy(false); } }
   const active = grants.filter((grant) => grant.status === "ACTIVE");
   return <div className="detail-section"><form className="share-form" onSubmit={grant}><label>Recipient email<input name="email" placeholder="colleague@company.com" required type="email" /></label><label>Access<select defaultValue="READ" name="accessLevel"><option value="READ">Can view</option><option value="EDIT">Can edit</option></select></label><button className="button button--primary" disabled={busy} type="submit">Grant access</button></form><p className="security-inline">Recipients must already have an active TrustVault account. Revocation applies to their next request.</p><div className="grant-list">{active.length ? active.map((item) => <article key={item.id}><span className="avatar" aria-hidden="true">{item.recipient.name.slice(0, 2).toUpperCase()}</span><div><strong>{item.recipient.name}</strong><small>{item.recipient.email}</small></div><select aria-label={`Access for ${item.recipient.name}`} disabled={busy} onChange={(event) => void change(item, "PATCH", event.target.value as "READ" | "EDIT")} value={item.accessLevel}><option value="READ">View</option><option value="EDIT">Edit</option></select><button className="danger-link" disabled={busy} onClick={() => void change(item, "DELETE")} type="button">Revoke</button></article>) : <p className="inline-empty">This document is not shared with anyone.</p>}</div></div>;
 }

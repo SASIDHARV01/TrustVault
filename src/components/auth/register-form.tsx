@@ -45,7 +45,6 @@ export function RegisterForm({ callbackPath }: { callbackPath: string }) {
     }
 
     router.replace(callbackPath);
-    router.refresh();
   }
 
   return (
