@@ -515,7 +515,7 @@ and explicitly audited content override, but no owner or user-lifecycle powers.
 Validate member/admin journeys with an isolated PostgreSQL database and desktop
 and mobile browser passes, without claiming fake R2 credentials prove storage.
 
-**Commit evidence:** pending Phase 8 commits
+**Commit evidence:** [97f7415](../../commit/97f7415), [dcdad5d](../../commit/dcdad5d), [5e02700](../../commit/5e02700), [58c4a2a](../../commit/58c4a2a)
 
 ## 2026-10-23 — 17 — Phase 9 adversarial security hardening
 
@@ -546,7 +546,158 @@ store raw client addresses, and prove the shared counter atomically under
 concurrency. Keep placeholder CI storage credentials honest: the browser path
 does not claim live R2 verification, which remains a deployment task.
 
-**Commit evidence:** pending Phase 9 commits
+**Commit evidence:** [ff315c0](../../commit/ff315c0), [f67eb56](../../commit/f67eb56), [c6464dc](../../commit/c6464dc), [9171fd4](../../commit/9171fd4)
+
+## 2026-10-24 — 18 — Production credentials, latency, and end-to-end proof
+
+**What was asked**
+
+Connect real Supabase and Cloudflare R2 credentials, run the application, explain
+the backend location, fix slow operations, and test the complete live workflow
+before deployment.
+
+**What the AI produced**
+
+It guided the Supabase pooler/R2 configuration, repaired CI seeding and Prisma
+generation, reduced redundant client requests, stabilized serialized audit
+transactions under real pooled latency, and added production-oriented storage
+and security journeys.
+
+**What was weak or wrong**
+
+The first database guidance incorrectly generalized the session-pooler port;
+Supabase connection strings must be copied exactly because transaction and
+session poolers can use different hosts, usernames, and ports. Earlier secret
+handling also caused GitGuardian alerts, proving that placeholder discipline
+and credential rotation cannot be treated as optional.
+
+**What we chose instead**
+
+Use the exact Supabase-provided URLs, keep runtime and migration connections
+separate, validate required variables without printing values, keep all real
+secrets outside Git, and distinguish local/in-memory proof from live R2 proof.
+Optimize request duplication without caching authorization decisions.
+
+**Commit evidence:** [15774f6](../../commit/15774f6), [c89afc3](../../commit/c89afc3), [c61c6bd](../../commit/c61c6bd)
+
+## 2026-10-24 — 19 — Cybervault interface and separated document views
+
+**What was asked**
+
+Redesign the interface as a cyber-security multiverse, replay a cinematic
+five-to-six-second landing sequence, separate owned documents from granted
+documents, and show meaningful progress stages for authentication and uploads.
+
+**What the AI produced**
+
+It introduced the cyberpunk visual system, cinematic landing sequence, operation
+telemetry, responsive member/admin views, and distinct My Documents and Shared
+Dimensions areas.
+
+**What was weak or wrong**
+
+The first intro persisted a completed flag and therefore did not replay on every
+landing reload as requested. Visual polish also risked implying security through
+animation rather than preserving the real server-enforced permission boundary.
+
+**What we chose instead**
+
+Replay the sequence only on the public landing route, never block protected
+workspace navigation, preserve reduced-motion behavior, and keep every animated
+operation tied to a real API request rather than using it as authorization.
+
+**Commit evidence:** [cf6f8e0](../../commit/cf6f8e0), [96e0f51](../../commit/96e0f51), [ce68760](../../commit/ce68760), [d9a7a37](../../commit/d9a7a37)
+
+## 2026-10-25 — 20 — Vercel migration and custom-domain cutover
+
+**What was asked**
+
+Replace the sleeping Render deployment with a host that opens quickly, deploy on
+Vercel, connect `trust-vault.aquaries.dev` through Cloudflare, and preserve all
+database, storage, migration, and security behavior.
+
+**What the AI produced**
+
+It added Vercel configuration and deployment guidance, restored the migration
+quality gate, aligned the runtime with Supabase pooling, and guided the exact
+Cloudflare CNAME verification and `APP_URL` cutover.
+
+**What was weak or wrong**
+
+The initial hosting plan selected Render despite its free-tier sleep behavior.
+The first Cloudflare record was proxied even though Vercel verification required
+DNS-only mode, and a generated-client omission initially broke CI demo seeding.
+
+**What we chose instead**
+
+Use Vercel for the full-stack Next.js deployment, keep Cloudflare as DNS and R2,
+generate Prisma before seeding/building, run migrations only from a controlled
+environment, and verify custom-domain TLS and production origin checks before
+retiring the old host.
+
+**Commit evidence:** [dda225b](../../commit/dda225b), [6857c42](../../commit/6857c42), [d56c5b5](../../commit/d56c5b5), [4d5ff4a](../../commit/4d5ff4a)
+
+## 2026-10-25 — 21 — Access intelligence and immediate-revocation evidence
+
+**What was asked**
+
+Make audit reporting show who received access, who granted it, grant and revoke
+times, first/latest use, per-operation usage totals, the revoker, and unauthorized
+attempts after revocation. Keep revoked history and provide the same system-wide
+evidence to administrators.
+
+**What the AI produced**
+
+It derived grant-lifecycle summaries from immutable audit events, separated
+re-grants into non-overlapping windows, added owner history cards, introduced an
+administrator-only Access Intelligence API/dashboard, and expanded activity
+details with safe request-correlated evidence.
+
+**What was weak or wrong**
+
+Maintaining editable usage counters would have created a second source of truth,
+and grouping only by recipient/document would have wrongly assigned new activity
+to an older revoked grant. Calling every denied event an identified attacker
+would also overstate what an unauthenticated request can prove.
+
+**What we chose instead**
+
+Calculate usage from the append-only event chain at read time, bound each grant
+by its creation and the next grant's creation, report authenticated identity
+when known, and label anonymous/system evidence honestly. Reading the global
+report is itself audited and restricted to administrators.
+
+**Commit evidence:** [3d0225a](../../commit/3d0225a), [10cd57e](../../commit/10cd57e)
+
+## 2026-10-25 — 22 — Secure in-app preview and CSP correction
+
+**What was asked**
+
+Open authorized PDFs/images inside TrustVault without automatically downloading
+them, investigate the production “content is blocked” failure, and retain fresh
+authorization on every preview.
+
+**What the AI produced**
+
+It replaced new-tab preview with a TrustVault modal backed by a temporary Blob
+URL, revoked that URL on close, preserved explicit download separately, and
+added the narrowly required CSP frame source for production rendering.
+
+**What was weak or wrong**
+
+The first preview implementation used a Blob iframe while the existing policy
+had no `frame-src`; CSP therefore fell back to `default-src 'self'` and blocked
+the PDF. The initial diagnosis was correct, but the already-open production tab
+continued enforcing its old response policy until a clean reload.
+
+**What we chose instead**
+
+Allow only same-origin and `blob:` frames while retaining `object-src 'none'`,
+foreign-frame blocking, private/no-store content, actual-byte hash verification,
+and current database authorization. Add a regression assertion and verify the
+live response header after deployment.
+
+**Commit evidence:** [3d0225a](../../commit/3d0225a), [1efedf7](../../commit/1efedf7)
 
 ## Entry template
 

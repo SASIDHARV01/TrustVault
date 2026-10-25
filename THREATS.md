@@ -1,6 +1,6 @@
 # TrustVault Threat Model
 
-Last reviewed: 2026-10-22
+Last reviewed: 2026-10-25
 
 This document is a living security contract for TrustVault. A feature is not
 complete until its relevant threats have an enforcement point and an automated
@@ -234,7 +234,9 @@ Each identifier is stable and will be referenced by automated tests.
   reasons, or document preview content.
 - Control: React escaping, schema validation, plain-text rendering for user
   metadata, nonce-based Content Security Policy on dynamic application pages,
-  safe content disposition, and no inline rendering of active file types in v1.
+  safe content disposition, and narrowly scoped `blob:` frame/image sources for
+  authorized PDF/image preview while scripts, objects, and foreign frames remain
+  blocked.
 - Test: a stored event-handler payload renders as text under a policy without
   `unsafe-inline`, and downloads use safe headers.
 
@@ -283,8 +285,10 @@ Each identifier is stable and will be referenced by automated tests.
 
 ## Accepted constraints for the hackathon release
 
-- Render's free service may sleep and cold-start; this affects availability, not
-  authorization. The demo plan must warm the service before judging.
+- Vercel Hobby and the managed data providers can still introduce transient
+  function/database latency; this affects availability, not authorization. The
+  static landing experience remains CDN-served, and the demo plan includes a
+  production smoke test before judging.
 - Full malware scanning may require infrastructure beyond the free-tier project.
   Until introduced, v1 supports only a narrow passive-document allowlist and
   clearly reports that scanning is not provided.
@@ -304,7 +308,8 @@ access, and chain verification. Phase 6 adds validated private content,
 immutable versions, per-request delivery authorization, failure compensation,
 administrator override evidence, and external chain-head checkpoints. Phase 7
 adds owner-scoped categories and authorization-composed document search. Phase
-9 adds shared request limits, nonce-based browser policy, provider deadlines,
+8 adds complete member and administrator workspaces. Phase 9 adds shared request
+limits, nonce-based browser policy, provider deadlines,
 adversarial Chromium journeys, and a CI security gate.
 
 - TV-001: `/vault`, `/admin`, and `GET /api/session` validate the current

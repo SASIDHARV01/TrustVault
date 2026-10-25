@@ -1,6 +1,6 @@
 # TrustVault Authentication Architecture
 
-Last verified: 2026-10-22
+Last verified: 2026-10-25
 
 ## What Phase 3 implements
 
@@ -18,8 +18,8 @@ PostgreSQL-backed sessions. It now provides:
 - repeatable demo identities created without inserting raw passwords.
 
 Email verification, password reset email delivery, multi-factor authentication,
-user-management screens, and authentication audit-chain events are intentionally
-deferred to later phases. The current demo release must not be described as
+and user-management screens are deliberate hackathon exclusions. Authentication
+audit events are implemented. The current demo release must not be described as
 enterprise identity management.
 
 ## Request workflow
@@ -50,7 +50,7 @@ registration option.
 
 System role is also separate from document permissions. `ADMIN` permits entry to
 the administration area but does not silently grant document edit, delete, or
-sharing rights. Future administrator content viewing must use the explicit,
+sharing rights. Administrator content viewing uses the implemented explicit,
 reason-bearing `ADMIN_OVERRIDE_READ` workflow.
 
 ### Session freshness and disabled accounts

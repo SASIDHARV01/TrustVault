@@ -9,10 +9,9 @@ recipient lookup, owner-only grant listing, creation, access-level changes, and
 revocation. All decisions remain server-side and use the Phase 4.1
 `MANAGE_GRANTS` policy.
 
-Permission audit event types and append-only tables already exist, but the
-tamper-evident audit writer is not implemented in this phase. The permission
-routes must not be described as production-ready until that writer records
-allowed and denied sharing operations.
+Phase 4.3 originally prepared permission event types and append-only tables.
+Phase 5 subsequently completed the tamper-evident writer, and the current routes
+record allowed and denied sharing operations in the signed audit chain.
 
 ## Recipient lookup
 

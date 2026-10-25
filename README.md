@@ -4,7 +4,12 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 ## Project status
 
-TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. The production application uses Vercel with a Cloudflare-managed custom domain.
+TrustVault is a complete hackathon release for the Snovyasys document-security
+challenge. It was built incrementally, with each security phase validated and
+committed before the next phase. The production application uses Vercel with a
+Cloudflare-managed custom domain:
+
+**Production:** https://trust-vault.aquaries.dev
 
 Phases 0–7 currently provide the security contract, public web foundation,
 validated PostgreSQL data model, Better Auth credentials and sessions, protected
@@ -56,7 +61,7 @@ A viewer can access only documents covered by a current named-user grant:
 
 `EDIT` never permits deletion, recovery, ownership transfer, or permission management.
 
-## Planned architecture
+## Architecture
 
 - Full-stack Next.js with TypeScript and the Node.js runtime
 - Better Auth with PostgreSQL-backed sessions
@@ -95,7 +100,19 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/INTERFACE.md`](docs/INTERFACE.md) explains the member vault, administrator control room, browser request model, and UI verification boundary.
 - [`docs/SECURITY_HARDENING.md`](docs/SECURITY_HARDENING.md) explains request limits, browser defenses, adversarial journeys, CI enforcement, and remaining deployment checks.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) defines the Vercel configuration, Cloudflare cutover, rollback, and production smoke test.
-- Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
+
+## Demo identities
+
+The release includes three repeatable demo identities: administrator, document
+owner, and viewer. Their email addresses and passwords are supplied through the
+ignored local environment variables `DEMO_ADMIN_*`, `DEMO_OWNER_*`, and
+`DEMO_VIEWER_*`; real passwords are never committed. Run `npm run db:seed:demo`
+once from a trusted environment to create/enable them. The seed never overwrites
+an existing password.
+
+For judging, provide the three credentials privately alongside the live URL.
+Public registration always creates an ordinary member and cannot request the
+administrator role.
 
 ## Local development
 

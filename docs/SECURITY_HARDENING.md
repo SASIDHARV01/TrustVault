@@ -25,8 +25,9 @@ application limits are defense in depth and never decide authorization.
 
 Dynamic login, registration, vault, and administrator pages receive a fresh
 request nonce. Their Content Security Policy uses `strict-dynamic`, blocks
-objects, frames, workers and cross-origin forms, and does not permit
-`unsafe-inline`. Protected workspace pages also return `private, no-store`.
+objects, workers, foreign frames and cross-origin forms, allows only same-origin
+and temporary `blob:` frames for authorized document preview, and does not
+permit `unsafe-inline`. Protected workspace pages also return `private, no-store`.
 Static/public responses retain the compatible baseline policy configured by
 Next.js. Production responses add HSTS, while all environments send MIME,
 framing, opener, referrer, permissions, DNS-prefetch, and cross-domain-policy
