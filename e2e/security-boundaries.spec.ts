@@ -27,9 +27,6 @@ async function authenticatedPage(
   credentials: Credentials,
 ) {
   const context = await browser.newContext();
-  await context.addInitScript(() => {
-    window.sessionStorage.setItem("trustvault-cyber-intro-seen", "true");
-  });
   const page = await context.newPage();
   await page.goto("/login");
   await page.getByLabel("Email address").fill(credentials.email);

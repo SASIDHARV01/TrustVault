@@ -1,37 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const introStorageKey = "trustvault-cyber-intro-seen";
+import { usePathname } from "next/navigation";
 
 export function CyberIntro() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const forceReplay = new URLSearchParams(window.location.search).get("intro") === "1";
-
-    try {
-      if (!forceReplay && window.sessionStorage.getItem(introStorageKey)) {
-        setVisible(false);
-        return;
-      }
-    } catch {
-      // The intro can still run when storage is unavailable.
+    if (pathname !== "/") {
+      setVisible(false);
+      return;
     }
 
+    setVisible(true);
+
     const timeoutId = window.setTimeout(() => {
-      try {
-        window.sessionStorage.setItem(introStorageKey, "true");
-      } catch {
-        // Storage restrictions should never block the application.
-      }
       setVisible(false);
     }, 5850);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [pathname]);
 
-  if (!visible) return null;
+  if (pathname !== "/" || !visible) return null;
 
   return (
     <div className="cyber-intro" role="status" aria-label="TrustVault secure channel initialization">
