@@ -1,18 +1,16 @@
-import "server-only";
-
 import { createHash } from "node:crypto";
 
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
   consumeDistributedRateLimit,
-  type RequestRateLimitDecision,
-} from "@/lib/server/request-rate-limit";
+  type DistributedRateLimitDecision,
+} from "@/lib/server/distributed-rate-limit";
 
 type ConsumeDistributedRateLimit = (
   key: string,
   rule: { windowSeconds: number; maximum: number },
   database: PrismaClient,
-) => Promise<RequestRateLimitDecision>;
+) => Promise<DistributedRateLimitDecision>;
 
 export function createAuthRateLimitStorage(
   database: PrismaClient,
