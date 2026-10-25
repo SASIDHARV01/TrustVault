@@ -20,6 +20,11 @@ export type RequestRateLimitPolicy = keyof typeof requestRateLimitPolicies;
 
 type RateLimitRow = { count: number; windowStartedAt: Date };
 
+export type DistributedRateLimitRule = {
+  windowSeconds: number;
+  maximum: number;
+};
+
 export type RequestRateLimitDecision = {
   allowed: boolean;
   limit: number;
@@ -44,14 +49,12 @@ export function requestRateLimitKey(
     .digest("hex");
 }
 
-export async function consumeRequestRateLimit(
-  request: Request,
-  policy: RequestRateLimitPolicy,
+export async function consumeDistributedRateLimit(
+  key: string,
+  rule: DistributedRateLimitRule,
   database: PrismaClient = getDatabase(),
   now = new Date(),
 ): Promise<RequestRateLimitDecision> {
-  const rule = requestRateLimitPolicies[policy];
-  const key = requestRateLimitKey(request, policy);
   const resetBefore = new Date(now.getTime() - rule.windowSeconds * 1000);
 
   const rows = await database.$queryRaw<RateLimitRow[]>`
@@ -89,6 +92,20 @@ export async function consumeRequestRateLimit(
     retryAfterSeconds,
     resetAt,
   };
+}
+
+export async function consumeRequestRateLimit(
+  request: Request,
+  policy: RequestRateLimitPolicy,
+  database: PrismaClient = getDatabase(),
+  now = new Date(),
+) {
+  return consumeDistributedRateLimit(
+    requestRateLimitKey(request, policy),
+    requestRateLimitPolicies[policy],
+    database,
+    now,
+  );
 }
 
 function applyDecisionHeaders(

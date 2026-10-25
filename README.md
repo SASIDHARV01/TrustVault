@@ -4,7 +4,7 @@ TrustVault is a security-first document-sharing platform where access is granted
 
 ## Project status
 
-TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. Production deployment to Render and the Cloudflare domain is intentionally scheduled for the final implementation phase.
+TrustVault is being built incrementally for the Snovyasis document-security challenge. Each phase is validated and committed before the next phase begins. The production application uses Vercel with a Cloudflare-managed custom domain.
 
 Phases 0–7 currently provide the security contract, public web foundation,
 validated PostgreSQL data model, Better Auth credentials and sessions, protected
@@ -21,7 +21,7 @@ and safe sort/pagination fields. Phase 8 adds responsive member and administrato
 workspaces for those capabilities. Phase 9 adds shared PostgreSQL-backed request
 limits, nonce-based browser policy, provider timeouts, adversarial browser
 journeys, and an automated security quality gate. Live R2 verification and
-deployment remain upcoming phases.
+deployment verification are now part of Phase 10.
 
 ## Security invariants
 
@@ -62,7 +62,7 @@ A viewer can access only documents covered by a current named-user grant:
 - Better Auth with PostgreSQL-backed sessions
 - Supabase-hosted PostgreSQL with Prisma migrations
 - Private Cloudflare R2 document storage
-- Render Free Web Service for the final deployment
+- Vercel Fluid Compute for the full-stack Next.js deployment
 - Cloudflare-managed custom domain and HTTPS
 - Vitest, PostgreSQL integration tests, and Playwright security journeys
 
@@ -94,6 +94,7 @@ These exclusions keep the authorization model small enough to reason about and t
 - [`docs/ORGANIZATION_SEARCH.md`](docs/ORGANIZATION_SEARCH.md) documents owner-scoped categories, authorization-composed search filters, and enumeration controls.
 - [`docs/INTERFACE.md`](docs/INTERFACE.md) explains the member vault, administrator control room, browser request model, and UI verification boundary.
 - [`docs/SECURITY_HARDENING.md`](docs/SECURITY_HARDENING.md) explains request limits, browser defenses, adversarial journeys, CI enforcement, and remaining deployment checks.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) defines the Vercel configuration, Cloudflare cutover, rollback, and production smoke test.
 - Seed credentials, clean-clone setup, deployment instructions, and the demo guide will be added in their corresponding phases.
 
 ## Local development

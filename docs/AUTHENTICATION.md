@@ -73,16 +73,16 @@ an existing session is used by any protected TrustVault route.
 ### Authentication throttling
 
 Authentication rate limiting is enabled in every environment. Sign-in permits
-10 attempts per minute per Better Auth key and registration permits 5. The
-current in-memory limiter is appropriate for the planned single Render instance;
-a multi-instance deployment would require shared rate-limit storage.
+10 attempts per minute per Better Auth key and registration permits 5. Better
+Auth uses the same atomic PostgreSQL counter table as the protected application
+routes, so limits remain shared across independently scaled Vercel functions.
 
 ## Environment variables
 
 Required at runtime:
 
-- `DATABASE_URL`: persistent PostgreSQL runtime connection, normally the
-  Supabase session pooler on port `5432`;
+- `DATABASE_URL`: pooled PostgreSQL runtime connection, normally the Supabase
+  transaction pooler on port `6543` for Vercel;
 - `APP_URL`: exact public application origin, for example
   `https://vault.example.com`;
 - `BETTER_AUTH_SECRET`: at least 32 random characters, generated independently
