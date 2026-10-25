@@ -4,6 +4,10 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getDatabase } from "@/lib/server/database";
+import {
+  consumeDistributedRateLimit,
+  type DistributedRateLimitDecision,
+} from "@/lib/server/distributed-rate-limit";
 
 export const requestRateLimitPolicies = {
   DOCUMENT_SEARCH: { windowSeconds: 60, maximum: 120 },
@@ -17,21 +21,6 @@ export const requestRateLimitPolicies = {
 } as const;
 
 export type RequestRateLimitPolicy = keyof typeof requestRateLimitPolicies;
-
-type RateLimitRow = { count: number; windowStartedAt: Date };
-
-export type DistributedRateLimitRule = {
-  windowSeconds: number;
-  maximum: number;
-};
-
-export type RequestRateLimitDecision = {
-  allowed: boolean;
-  limit: number;
-  remaining: number;
-  retryAfterSeconds: number;
-  resetAt: Date;
-};
 
 function normalizedClientAddress(request: Request) {
   const cloudflare = request.headers.get("cf-connecting-ip")?.trim();
@@ -47,51 +36,6 @@ export function requestRateLimitKey(
   return createHash("sha256")
     .update(`${policy}\0${normalizedClientAddress(request)}`, "utf8")
     .digest("hex");
-}
-
-export async function consumeDistributedRateLimit(
-  key: string,
-  rule: DistributedRateLimitRule,
-  database: PrismaClient = getDatabase(),
-  now = new Date(),
-): Promise<RequestRateLimitDecision> {
-  const resetBefore = new Date(now.getTime() - rule.windowSeconds * 1000);
-
-  const rows = await database.$queryRaw<RateLimitRow[]>`
-    INSERT INTO "RequestRateLimit"
-      ("key", "count", "windowStartedAt", "updatedAt")
-    VALUES
-      (${key}, 1, ${now}, ${now})
-    ON CONFLICT ("key") DO UPDATE SET
-      "count" = CASE
-        WHEN "RequestRateLimit"."windowStartedAt" <= ${resetBefore} THEN 1
-        ELSE LEAST("RequestRateLimit"."count" + 1, ${rule.maximum + 1})
-      END,
-      "windowStartedAt" = CASE
-        WHEN "RequestRateLimit"."windowStartedAt" <= ${resetBefore} THEN ${now}
-        ELSE "RequestRateLimit"."windowStartedAt"
-      END,
-      "updatedAt" = ${now}
-    RETURNING "count", "windowStartedAt"
-  `;
-  const row = rows[0];
-  if (!row) throw new Error("Rate-limit counter did not return a row.");
-
-  const resetAt = new Date(
-    row.windowStartedAt.getTime() + rule.windowSeconds * 1000,
-  );
-  const retryAfterSeconds = Math.max(
-    1,
-    Math.ceil((resetAt.getTime() - now.getTime()) / 1000),
-  );
-
-  return {
-    allowed: row.count <= rule.maximum,
-    limit: rule.maximum,
-    remaining: Math.max(0, rule.maximum - row.count),
-    retryAfterSeconds,
-    resetAt,
-  };
 }
 
 export async function consumeRequestRateLimit(
@@ -110,7 +54,7 @@ export async function consumeRequestRateLimit(
 
 function applyDecisionHeaders(
   response: Response,
-  decision: RequestRateLimitDecision,
+  decision: DistributedRateLimitDecision,
 ) {
   response.headers.set("X-RateLimit-Limit", String(decision.limit));
   response.headers.set("X-RateLimit-Remaining", String(decision.remaining));
@@ -121,7 +65,7 @@ function applyDecisionHeaders(
   return response;
 }
 
-function limitedResponse(decision: RequestRateLimitDecision) {
+function limitedResponse(decision: DistributedRateLimitDecision) {
   const requestId = randomUUID();
   const response = Response.json(
     {
