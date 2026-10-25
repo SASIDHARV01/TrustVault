@@ -11,6 +11,7 @@ describe("protected page content security policy", () => {
     expect(policy).not.toContain("'unsafe-inline'");
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("frame-src 'self' blob:");
     expect(policy).toContain("object-src 'none'");
   });
 
