@@ -1,6 +1,6 @@
 # TrustVault Permission Management
 
-Last verified: 2026-10-22
+Last verified: 2026-10-25
 
 ## Phase 4.3 scope
 
@@ -34,6 +34,19 @@ search. Endpoint rate limiting remains required before production deployment.
 Returns active and revoked grant history to the document owner. READ/EDIT
 recipients, unrelated users, and administrators receive the same non-revealing
 document response used for inaccessible metadata.
+
+Each lifecycle includes a server-derived access summary: first/latest use,
+successful operation counts, revocation identity/time, and blocked attempts
+after revocation. Re-granting the same recipient creates a new lifecycle window;
+events are never reassigned across that boundary.
+
+### `GET /api/admin/access`
+
+Returns the same evidence across all documents only to administrators. Search is
+bounded to document, owner, and recipient identity; optional status and access
+level filters are allowlisted. Reading the report itself produces an
+`AUDIT_VIEW` event. This visibility does not grant administrators authority to
+edit, delete, share, or silently read document content.
 
 ### `POST /api/documents/:documentId/grants`
 

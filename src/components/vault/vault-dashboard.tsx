@@ -448,6 +448,17 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<"metadata" | "version" | "content" | "remove" | null>(null);
   const [error, setError] = useState("");
+  const [preview, setPreview] = useState<{
+    url: string;
+    filename: string;
+    mimeType: string;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview.url);
+    };
+  }, [preview]);
 
   const markSectionLoaded = useCallback((loadedSection: DetailSection) => {
     setLoadedSections((current) => new Set(current).add(loadedSection));
@@ -507,22 +518,6 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
     });
   }
 
-  function applyGrantChange(nextGrant: DocumentGrant) {
-    setGrants((current) => {
-      if (nextGrant.status === "REVOKED") {
-        return current.map((grant) => grant.id === nextGrant.id ? nextGrant : grant);
-      }
-      return [
-        nextGrant,
-        ...current.filter((grant) =>
-          grant.id !== nextGrant.id &&
-          !(grant.status === "ACTIVE" && grant.recipient.id === nextGrant.recipient.id),
-        ),
-      ];
-    });
-    invalidateActivity();
-  }
-
   async function update(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setOperation("metadata"); setError("");
     const form = new FormData(event.currentTarget);
@@ -559,12 +554,19 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
       const path = `/api/documents/${document.id}/versions/${version.id}/content${download ? "?disposition=attachment" : ""}`;
       const content = await fetchPrivateContent(path);
       const url = URL.createObjectURL(content.blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      if (download) link.download = content.filename ?? version.originalFilename;
-      else { link.target = "_blank"; link.rel = "noopener"; }
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (download) {
+        const link = window.document.createElement("a");
+        link.href = url;
+        link.download = content.filename ?? version.originalFilename;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } else {
+        setPreview({
+          url,
+          filename: content.filename ?? version.originalFilename,
+          mimeType: content.mimeType,
+        });
+      }
     } catch (caught) { setError(readableError(caught)); } finally { setBusy(false); setOperation(null); }
   }
 
@@ -601,8 +603,9 @@ function DocumentDialog({ document: initial, categories, onClose, onChanged, onR
         </form>
       ) : null}
       {loadedSections.has("versions") && section === "versions" ? <VersionsPanel busy={busy} canUpload={(document.access === "OWNER" || document.access === "EDIT") && document.state === "ACTIVE"} onOpen={openContent} onUpload={uploadVersion} uploading={operation === "version"} versions={versions} /> : null}
-      {loadedSections.has("sharing") && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={applyGrantChange} show={show} /> : null}
+      {loadedSections.has("sharing") && section === "sharing" ? <SharingPanel documentId={document.id} grants={grants} onChanged={() => { void loadGrants(); invalidateActivity(); }} show={show} /> : null}
       {loadedSections.has("activity") && section === "activity" ? <ActivityList events={events} /> : null}
+      {preview ? <ContentPreview content={preview} onClose={() => setPreview(null)} /> : null}
     </DialogFrame>
   );
 }
@@ -615,10 +618,20 @@ function SharingPanel({ documentId, grants, onChanged, show }: { documentId: str
   const [busyAction, setBusyAction] = useState<{ kind: "grant" | "update" | "revoke"; grantId?: string } | null>(null);
   async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); setBusyAction({ kind: "grant" }); const formElement = event.currentTarget; const form = new FormData(formElement); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants`, { method: "POST", body: JSON.stringify({ recipientEmail: String(form.get("email")), accessLevel: String(form.get("accessLevel")) }) }); formElement.reset(); onChanged(result.data.grant); show("success", "Access granted and recorded."); } catch (error) { show("error", readableError(error)); } finally { setBusyAction(null); } }
   async function change(item: DocumentGrant, method: "PATCH" | "DELETE", accessLevel?: "READ" | "EDIT") { setBusyAction({ kind: method === "DELETE" ? "revoke" : "update", grantId: item.id }); try { const result = await apiJson<{ data: { grant: DocumentGrant } }>(`/api/documents/${documentId}/grants/${item.id}`, { method, ...(accessLevel ? { body: JSON.stringify({ accessLevel }) } : {}) }); onChanged(result.data.grant); show("success", method === "DELETE" ? "Access revoked immediately and recorded." : "Access clearance updated."); } catch (error) { show("error", readableError(error)); } finally { setBusyAction(null); } }
-  const active = grants.filter((grant) => grant.status === "ACTIVE");
-  return <div className="detail-section"><form className="share-form" onSubmit={grant}><label>Recipient email<input disabled={Boolean(busyAction)} name="email" placeholder="colleague@company.com" required type="email" /></label><label>Access<select defaultValue="READ" disabled={Boolean(busyAction)} name="accessLevel"><option value="READ">Can view</option><option value="EDIT">Can edit</option></select></label><CyberActionButton disabled={Boolean(busyAction) && busyAction?.kind !== "grant"} idleLabel="Grant clearance" pending={busyAction?.kind === "grant"} stages={grantStages} type="submit" /></form><p className="security-inline">Recipients must already have an active TrustVault identity. Revocation is enforced on their next request.</p>{busyAction && busyAction.kind !== "grant" ? <div className="operation-transmission operation-transmission--compact" role="status"><span /><p><strong>{busyAction.kind === "revoke" ? revokeStages[1] : "Updating permission boundary"}</strong><small>The server is recording this authorization change.</small></p></div> : null}<div className="grant-list">{active.length ? active.map((item) => <article key={item.id}><span className="avatar" aria-hidden="true">{item.recipient.name.slice(0, 2).toUpperCase()}</span><div><strong>{item.recipient.name}</strong><small>{item.recipient.email}</small></div><select aria-label={`Access for ${item.recipient.name}`} disabled={Boolean(busyAction)} onChange={(event) => void change(item, "PATCH", event.target.value as "READ" | "EDIT")} value={item.accessLevel}><option value="READ">View</option><option value="EDIT">Edit</option></select><button className="danger-link" disabled={Boolean(busyAction)} onClick={() => void change(item, "DELETE")} type="button">{busyAction?.kind === "revoke" && busyAction.grantId === item.id ? "Revoking…" : "Revoke"}</button></article>) : <p className="inline-empty">This document is not shared with anyone.</p>}</div></div>;
+  return <div className="detail-section"><form className="share-form" onSubmit={grant}><label>Recipient email<input disabled={Boolean(busyAction)} name="email" placeholder="colleague@company.com" required type="email" /></label><label>Access<select defaultValue="READ" disabled={Boolean(busyAction)} name="accessLevel"><option value="READ">Can view</option><option value="EDIT">Can edit</option></select></label><CyberActionButton disabled={Boolean(busyAction) && busyAction?.kind !== "grant"} idleLabel="Grant clearance" pending={busyAction?.kind === "grant"} stages={grantStages} type="submit" /></form><p className="security-inline">Every active and revoked grant remains visible below as security evidence. Usage totals come from the immutable audit trail.</p>{busyAction && busyAction.kind !== "grant" ? <div className="operation-transmission operation-transmission--compact" role="status"><span /><p><strong>{busyAction.kind === "revoke" ? revokeStages[1] : "Updating permission boundary"}</strong><small>The server is recording this authorization change.</small></p></div> : null}<div className="grant-intelligence">{grants.length ? grants.map((item) => <article className={item.status === "REVOKED" ? "is-revoked" : ""} key={item.id}><header><span className="avatar" aria-hidden="true">{item.recipient.name.slice(0, 2).toUpperCase()}</span><div><strong>{item.recipient.name}</strong><small>{item.recipient.email}</small></div><i className="access-badge">{item.accessLevel} · {item.status}</i></header><div className="grant-lifecycle"><span><small>Granted by</small><strong>{item.grantedBy.name}</strong><time>{formatDate(item.createdAt)}</time></span><span><small>Latest use</small><strong>{item.usage.lastUsedAt ? formatDate(item.usage.lastUsedAt) : "Never used"}</strong><time>{item.usage.totalUses} audited use{item.usage.totalUses === 1 ? "" : "s"}</time></span><span><small>Revocation</small><strong>{item.revokedBy?.name ?? "Still active"}</strong><time>{item.revokedAt ? formatDate(item.revokedAt) : "—"}</time></span></div><div className="grant-usage-grid"><span><strong>{item.usage.previews}</strong><small>Previews</small></span><span><strong>{item.usage.downloads}</strong><small>Downloads</small></span><span><strong>{item.usage.metadataViews}</strong><small>Detail views</small></span><span><strong>{item.usage.metadataEdits}</strong><small>Edits</small></span><span><strong>{item.usage.versionUploads}</strong><small>Uploads</small></span><span className={item.usage.deniedAfterRevocationCount ? "has-denials" : ""}><strong>{item.usage.deniedAfterRevocationCount}</strong><small>Denied after revoke</small></span></div>{item.usage.firstUsedAt ? <p className="grant-evidence-line">First used {formatDate(item.usage.firstUsedAt)}{item.usage.latestDeniedAfterRevocationAt ? ` · Latest blocked attempt ${formatDate(item.usage.latestDeniedAfterRevocationAt)}` : ""}</p> : null}{item.status === "ACTIVE" ? <div className="grant-controls"><select aria-label={`Access for ${item.recipient.name}`} disabled={Boolean(busyAction)} onChange={(event) => void change(item, "PATCH", event.target.value as "READ" | "EDIT")} value={item.accessLevel}><option value="READ">View</option><option value="EDIT">Edit</option></select><button className="danger-link" disabled={Boolean(busyAction)} onClick={() => void change(item, "DELETE")} type="button">{busyAction?.kind === "revoke" && busyAction.grantId === item.id ? "Revoking…" : "Revoke immediately"}</button></div> : null}</article>) : <p className="inline-empty">This document has no permission history.</p>}</div></div>;
 }
 
 export function ActivityList({ events }: { events: AuditEvent[] }) {
-  return <div className="activity-list">{events.length ? events.map((event) => <article key={event.eventId}><span className={`outcome-dot outcome-dot--${event.outcome.toLowerCase()}`} /><div><strong>{event.action.replaceAll("_", " ").toLowerCase()}</strong><small>{event.actor?.name ?? "System"} · {event.reason.replaceAll("_", " ").toLowerCase()}</small></div><time>{formatDate(event.occurredAt)}</time></article>) : <p className="inline-empty">No activity matches this view.</p>}</div>;
+  return <div className="activity-list activity-list--detailed">{events.length ? events.map((event) => <details key={event.eventId}><summary><span className={`outcome-dot outcome-dot--${event.outcome.toLowerCase()}`} /><div><strong>{event.action.replaceAll("_", " ").toLowerCase()}</strong><small>{event.actor ? `${event.actor.name} · ${event.actor.email}` : "Anonymous or system"} · {event.reason.replaceAll("_", " ").toLowerCase()}</small></div><time>{formatDate(event.occurredAt)}</time></summary><dl><div><dt>Outcome</dt><dd>{event.outcome}</dd></div><div><dt>Document</dt><dd>{event.document?.name ?? "Not available"}</dd></div><div><dt>Target</dt><dd>{event.targetId || "—"}</dd></div><div><dt>Request ID</dt><dd>{event.requestId || "—"}</dd></div><div><dt>Resource</dt><dd>{event.resource}</dd></div><div><dt>Evidence</dt><dd>{formatAuditMetadata(event.metadata)}</dd></div></dl></details>) : <p className="inline-empty">No activity matches this view.</p>}</div>;
+}
+
+function formatAuditMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "No additional evidence";
+  const entries = Object.entries(metadata as Record<string, unknown>);
+  if (!entries.length) return "No additional evidence";
+  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
+}
+
+export function ContentPreview({ content, onClose }: { content: { url: string; filename: string; mimeType: string }; onClose: () => void }) {
+  return <div className="preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation"><section aria-label={`Preview ${content.filename}`} aria-modal="true" className="secure-preview" role="dialog"><header><div><p className="card-kicker">Authorized in-app preview</p><h2>{content.filename}</h2></div><button aria-label="Close preview" className="dialog__close" onClick={onClose} type="button">×</button></header><div className="secure-preview__surface">{content.mimeType === "application/pdf" ? <iframe src={content.url} title={content.filename} /> : <img alt={content.filename} src={content.url} />}</div><p>Preview bytes exist only in this browser session. Closing this viewer revokes its temporary Blob URL; opening it again requires a fresh server authorization check.</p></section></div>;
 }

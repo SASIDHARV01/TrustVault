@@ -47,6 +47,30 @@ export type DocumentGrant = {
   createdAt: string;
   updatedAt: string;
   revokedAt: string | null;
+  usage: {
+    totalUses: number;
+    metadataViews: number;
+    versionHistoryViews: number;
+    previews: number;
+    downloads: number;
+    metadataEdits: number;
+    versionUploads: number;
+    firstUsedAt: string | null;
+    lastUsedAt: string | null;
+    deniedAfterRevocationCount: number;
+    latestDeniedAfterRevocationAt: string | null;
+  };
+};
+
+export type AccessIntelligenceGrant = DocumentGrant & {
+  document: {
+    id: string;
+    name: string;
+    state: "ACTIVE" | "DELETED";
+    owner: UserSummary;
+  };
+  grantedBy: UserSummary;
+  revokedBy: UserSummary | null;
 };
 
 export type AuditEvent = {
@@ -135,6 +159,7 @@ export async function fetchPrivateContent(
   return {
     blob: await response.blob(),
     filename: filenameFromDisposition(response.headers.get("Content-Disposition")),
+    mimeType: response.headers.get("Content-Type") ?? "application/octet-stream",
   };
 }
 

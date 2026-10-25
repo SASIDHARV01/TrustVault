@@ -1,6 +1,6 @@
 # TrustVault Audit Trail
 
-Last verified: 2026-10-22
+Last verified: 2026-10-25
 
 ## Purpose
 
@@ -17,6 +17,14 @@ external checkpoint creation.
 Phase 7 adds allowed and denied `CATEGORY_CREATE`, `CATEGORY_UPDATE`, and
 `CATEGORY_DELETE` evidence. Category names are deliberately omitted from audit
 metadata; the owner already has the current display value in the category table.
+
+Access intelligence now correlates the immutable event stream with each stored
+grant lifecycle. For a recipient and document it reports who granted access,
+when it began, first and latest use, usage totals by operation, who revoked it,
+when it ended, and denied attempts after revocation. Re-grants create separate
+time windows, so an old grant never receives usage from a later authorization.
+The figures are derived from audit evidence at read time rather than maintained
+as editable counters.
 
 ## Event integrity
 
@@ -67,6 +75,10 @@ not general profile data.
   not-found response.
 - `GET /api/admin/activity` is administrator-only and supports bounded filters
   for actor, document, action, outcome, date range, page, and page size.
+- `GET /api/admin/access` is administrator-only and supports bounded search,
+  status, access-level, and pagination filters. Its response contains complete
+  grant lifecycle identities and derived use/revocation evidence, but no
+  document bytes, network addresses, user agents, hashes, or secret material.
 - `POST /api/admin/audit/verify` is administrator-only, requires a trusted
   mutation origin, and verifies the full chain from genesis using every required
   key version.
@@ -109,3 +121,8 @@ The live suite uses an isolated PostgreSQL 15 database and an in-memory object
 provider to prove checkpoint and document-byte workflows. It does not prove live
 R2 lock/privacy policy, deployed Supabase permissions, or production secret
 management.
+
+Focused access-intelligence tests also prove lifecycle separation across
+re-grants, successful-use breakdowns, post-revocation denial counts, strict
+query validation, authentication, administrator authorization, private caching,
+and request correlation.

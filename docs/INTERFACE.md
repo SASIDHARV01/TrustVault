@@ -1,6 +1,6 @@
 # TrustVault Vault and Administration Interface
 
-Last verified: 2026-10-23
+Last verified: 2026-10-25
 
 ## Phase 8 scope
 
@@ -20,8 +20,9 @@ The `/vault` workspace now supports:
 - metadata creation followed by the first immutable file upload;
 - metadata editing for owners and active EDIT recipients;
 - owner-only category assignment, deletion, restoration, and sharing controls;
-- PDF, PNG, and JPEG version upload, version history, verified preview, and
-  verified download;
+- PDF, PNG, and JPEG version upload, version history, verified in-app preview,
+  and explicit download. Preview bytes live in a temporary browser object URL,
+  never trigger a save action, and are released when the viewer closes;
 - READ or EDIT access grants by exact existing-account email, access-level
   changes, and immediate revocation; and
 - owner-visible per-document audit activity.
@@ -36,6 +37,9 @@ The `/admin` workspace now provides:
 
 - active/deleted document metadata discovery across owners;
 - system-wide audit event filters and pagination;
+- system-wide access intelligence showing document owner, recipient, grantor,
+  access level, grant/revocation times, first/latest use, per-operation counts,
+  revoker, and blocked post-revocation attempts;
 - full stored-chain verification;
 - protected R2 audit checkpoint creation and checkpoint history; and
 - document version preview/download through an explicit 10–500 character
@@ -53,7 +57,9 @@ Interactive components use same-origin, no-store requests with the existing
 database-backed session cookie. JSON mutations use the route schemas already
 defined for documents, categories, and grants. File bodies remain multipart.
 Binary content is fetched only after authorization and exposed through a short-
-lived browser object URL that is revoked after use.
+lived browser object URL that is revoked after use. Preview stays inside the
+TrustVault modal; only the separately labelled download action asks the browser
+to save a file. Each reopen performs a fresh server authorization check.
 
 Server Components continue to perform the initial session or administrator
 gate before the interactive workspace is rendered. Only minimal display-safe
