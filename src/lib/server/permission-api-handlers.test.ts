@@ -20,6 +20,19 @@ const grant = {
   createdAt: "2026-10-22T00:00:00.000Z",
   updatedAt: "2026-10-22T00:00:00.000Z",
   revokedAt: null,
+  usage: {
+    totalUses: 0,
+    metadataViews: 0,
+    versionHistoryViews: 0,
+    previews: 0,
+    downloads: 0,
+    metadataEdits: 0,
+    versionUploads: 0,
+    firstUsedAt: null,
+    lastUsedAt: null,
+    deniedAfterRevocationCount: 0,
+    latestDeniedAfterRevocationAt: null,
+  },
 };
 
 function dependencies(overrides: Record<string, unknown> = {}) {

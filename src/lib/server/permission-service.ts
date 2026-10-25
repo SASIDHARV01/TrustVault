@@ -44,7 +44,171 @@ const grantSelect = {
 
 type GrantRow = Prisma.DocumentGrantGetPayload<{ select: typeof grantSelect }>;
 
-function serializeGrant(grant: GrantRow) {
+const grantUsageActions = [
+  "DOCUMENT_METADATA_READ",
+  "DOCUMENT_READ",
+  "DOCUMENT_DOWNLOAD",
+  "DOCUMENT_UPDATE",
+  "DOCUMENT_DELETE",
+  "DOCUMENT_RESTORE",
+  "DOCUMENT_UPLOAD",
+  "DOCUMENT_VERSION_CREATE",
+  "PERMISSION_LIST",
+  "PERMISSION_GRANT",
+  "PERMISSION_UPDATE",
+  "PERMISSION_REVOKE",
+  "ADMIN_OVERRIDE_READ",
+] as const;
+
+const allowedGrantUseActions = new Set<string>([
+  "DOCUMENT_METADATA_READ",
+  "DOCUMENT_READ",
+  "DOCUMENT_DOWNLOAD",
+  "DOCUMENT_UPDATE",
+  "DOCUMENT_VERSION_CREATE",
+]);
+
+type GrantUsageEvent = {
+  actorId: string | null;
+  documentId: string | null;
+  action: (typeof grantUsageActions)[number];
+  outcome: "ALLOWED" | "DENIED" | "FAILED";
+  metadata: Prisma.JsonValue;
+  occurredAt: Date;
+};
+
+export type GrantUsageSummary = {
+  totalUses: number;
+  metadataViews: number;
+  versionHistoryViews: number;
+  previews: number;
+  downloads: number;
+  metadataEdits: number;
+  versionUploads: number;
+  firstUsedAt: string | null;
+  lastUsedAt: string | null;
+  deniedAfterRevocationCount: number;
+  latestDeniedAfterRevocationAt: string | null;
+};
+
+function metadataRecord(value: Prisma.JsonValue) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, Prisma.JsonValue>)
+    : {};
+}
+
+export function emptyGrantUsage(): GrantUsageSummary {
+  return {
+    totalUses: 0,
+    metadataViews: 0,
+    versionHistoryViews: 0,
+    previews: 0,
+    downloads: 0,
+    metadataEdits: 0,
+    versionUploads: 0,
+    firstUsedAt: null,
+    lastUsedAt: null,
+    deniedAfterRevocationCount: 0,
+    latestDeniedAfterRevocationAt: null,
+  };
+}
+
+export async function grantUsageById(
+  database: Pick<PrismaClient, "auditEvent">,
+  grants: Array<{
+    id: string;
+    documentId: string;
+    recipient: { id: string };
+    createdAt: Date;
+    revokedAt: Date | null;
+  }>,
+) {
+  if (!grants.length) return new Map<string, GrantUsageSummary>();
+
+  const events = await database.auditEvent.findMany({
+    where: {
+      documentId: { in: [...new Set(grants.map((grant) => grant.documentId))] },
+      actorId: { in: [...new Set(grants.map((grant) => grant.recipient.id))] },
+      action: { in: [...grantUsageActions] },
+      occurredAt: {
+        gte: new Date(Math.min(...grants.map((grant) => grant.createdAt.getTime()))),
+      },
+    },
+    orderBy: { occurredAt: "asc" },
+    select: {
+      actorId: true,
+      documentId: true,
+      action: true,
+      outcome: true,
+      metadata: true,
+      occurredAt: true,
+    },
+  }) as GrantUsageEvent[];
+
+  const groupedGrants = new Map<string, typeof grants>();
+  for (const grant of grants) {
+    const key = `${grant.documentId}\0${grant.recipient.id}`;
+    groupedGrants.set(key, [...(groupedGrants.get(key) ?? []), grant]);
+  }
+
+  const summaries = new Map<string, GrantUsageSummary>();
+  for (const [key, recipientGrants] of groupedGrants) {
+    recipientGrants.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    const [documentId, recipientId] = key.split("\0");
+    const matchingEvents = events.filter(
+      (event) => event.documentId === documentId && event.actorId === recipientId,
+    );
+
+    recipientGrants.forEach((grant, index) => {
+      const nextGrantAt = recipientGrants[index + 1]?.createdAt ?? null;
+      const inLifecycle = matchingEvents.filter(
+        (event) =>
+          event.occurredAt >= grant.createdAt &&
+          (!nextGrantAt || event.occurredAt < nextGrantAt),
+      );
+      const allowed = inLifecycle.filter(
+        (event) =>
+          event.outcome === "ALLOWED" &&
+          allowedGrantUseActions.has(event.action) &&
+          (!grant.revokedAt || event.occurredAt <= grant.revokedAt),
+      );
+      const deniedAfterRevocation = grant.revokedAt
+        ? inLifecycle.filter(
+            (event) => event.outcome === "DENIED" && event.occurredAt >= grant.revokedAt!,
+          )
+        : [];
+      const summary = emptyGrantUsage();
+
+      for (const event of allowed) {
+        const metadata = metadataRecord(event.metadata);
+        if (event.action === "DOCUMENT_METADATA_READ") summary.metadataViews += 1;
+        if (event.action === "DOCUMENT_DOWNLOAD") summary.downloads += 1;
+        if (event.action === "DOCUMENT_UPDATE") summary.metadataEdits += 1;
+        if (event.action === "DOCUMENT_VERSION_CREATE") summary.versionUploads += 1;
+        if (event.action === "DOCUMENT_READ" && metadata.disposition === "inline") {
+          summary.previews += 1;
+        } else if (
+          event.action === "DOCUMENT_READ" &&
+          metadata.scope === "VERSION_HISTORY"
+        ) {
+          summary.versionHistoryViews += 1;
+        }
+      }
+
+      summary.totalUses = allowed.length;
+      summary.firstUsedAt = allowed[0]?.occurredAt.toISOString() ?? null;
+      summary.lastUsedAt = allowed.at(-1)?.occurredAt.toISOString() ?? null;
+      summary.deniedAfterRevocationCount = deniedAfterRevocation.length;
+      summary.latestDeniedAfterRevocationAt =
+        deniedAfterRevocation.at(-1)?.occurredAt.toISOString() ?? null;
+      summaries.set(grant.id, summary);
+    });
+  }
+
+  return summaries;
+}
+
+function serializeGrant(grant: GrantRow, usage = emptyGrantUsage()) {
   return {
     id: grant.id,
     documentId: grant.documentId,
@@ -56,6 +220,7 @@ function serializeGrant(grant: GrantRow) {
     createdAt: grant.createdAt.toISOString(),
     updatedAt: grant.updatedAt.toISOString(),
     revokedAt: grant.revokedAt?.toISOString() ?? null,
+    usage,
   };
 }
 
@@ -172,6 +337,7 @@ export async function listDocumentGrants(
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         select: grantSelect,
       });
+      const usage = await grantUsageById(transaction, grants);
 
       await recordPermissionAudit(transaction, auditContext, {
         actorId: actor.id,
@@ -184,7 +350,11 @@ export async function listDocumentGrants(
         metadata: { resultCount: grants.length },
       });
 
-      return { value: { grants: grants.map(serializeGrant) } } as const;
+      return {
+        value: {
+          grants: grants.map((grant) => serializeGrant(grant, usage.get(grant.id))),
+        },
+      } as const;
     },
   );
 

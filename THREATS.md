@@ -397,6 +397,11 @@ adversarial Chromium journeys, and a CI security gate.
 - TV-006: grant revocation preserves the row but removes it from current access
   checks. A live permission-to-document API journey proves the next metadata
   request changes from 200 to the non-revealing 404.
+- TV-006, TV-014, and TV-015: owner grant history and administrator access
+  intelligence derive first/latest use, operation counts, revocation identity,
+  and post-revocation denials from immutable audit events. Re-grant lifecycles
+  use non-overlapping time windows so evidence is not attributed to the wrong
+  authorization period.
 - TV-008: recipient discovery requires one exact valid email rather than broad
   directory search. Disabled, missing, and self-recipient cases share the same
   public response and do not expose role or account status.
@@ -417,6 +422,10 @@ adversarial Chromium journeys, and a CI security gate.
 - TV-012 and TV-013: upload uses explicit PENDING/READY/FAILED states and
   compensating object deletion. Content is server-proxied with private/no-store
   headers and actual-byte SHA-256 verification before delivery.
+- TV-013 and TV-019: preview remains inside TrustVault through a temporary Blob
+  URL that is revoked on close; only the explicit download control initiates a
+  save. Reopening preview performs a new server-side authorization and integrity
+  check, so a stale UI cannot bypass revocation.
 
 - TV-005: a partial unique PostgreSQL index permits at most one active grant per
   document and recipient while retaining revoked grants as history.
