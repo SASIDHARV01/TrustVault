@@ -88,5 +88,5 @@ against PostgreSQL 15. Failure artifacts retain traces, screenshots, and video.
 
 Phase 9 is complete when these checks pass locally and in CI. Production
 readiness still requires Phase 10 to configure Supabase, a real private R2
-bucket/token and checkpoint lock, Render secrets and health behavior, Cloudflare
+bucket/token and checkpoint lock, Vercel secrets and function health, Cloudflare
 DNS/TLS, backup/restore, secret rotation, and a live post-deploy smoke test.

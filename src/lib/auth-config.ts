@@ -3,6 +3,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 
 import type { PrismaClient } from "../generated/prisma/client";
+import { createAuthRateLimitStorage } from "@/lib/server/auth-rate-limit";
 
 export function createTrustVaultAuth({
   database,
@@ -79,7 +80,7 @@ export function createTrustVaultAuth({
     },
     rateLimit: {
       enabled: rateLimitEnabled,
-      storage: "memory",
+      customStorage: createAuthRateLimitStorage(database),
       window: 60,
       max: 100,
       customRules: {
